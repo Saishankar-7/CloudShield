@@ -3,13 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import BrandLogo from '../../components/BrandLogo';
-import { KeyRound, AlertCircle, Mail, Lock, Eye, EyeOff, Sun, Moon, ShieldCheck } from 'lucide-react';
+import { KeyRound, AlertCircle, Mail, Lock, Eye, EyeOff, Sun, Moon, ShieldCheck, CheckCircle2, Loader2 } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [authState, setAuthState] = useState('idle'); // 'idle' | 'scanning' | 'success' | 'error'
   const [error, setError] = useState('');
   
   const { login } = useAuth();
@@ -19,27 +19,44 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+    setAuthState('scanning');
     
     try {
       const res = await login(email, password);
       
-      if (res.mfaRequired) {
-        navigate('/mfa');
-      } else {
-        const userJson = JSON.parse(localStorage.getItem('user') || '{}');
-        if (userJson?.role === 'admin') {
-          navigate('/admin');
+      setAuthState('success');
+      
+      setTimeout(() => {
+        if (res.mfaRequired) {
+          navigate('/mfa');
         } else {
-          navigate('/');
+          const userJson = JSON.parse(localStorage.getItem('user') || '{}');
+          if (userJson?.role === 'admin') {
+            navigate('/admin');
+          } else {
+            navigate('/');
+          }
         }
-      }
+      }, 550);
     } catch (err) {
-      setError(err.message || 'Login failed. Please verify credentials.');
-    } finally {
-      setLoading(false);
+      setAuthState('error');
+      setError(err.message || 'Authentication failed. Please verify security credentials.');
+      // Auto clear error shake class after animation so user can re-attempt
+      setTimeout(() => {
+        setAuthState('idle');
+      }, 500);
     }
   };
+
+  const cardClass = `auth-card ${
+    authState === 'scanning'
+      ? 'scanning'
+      : authState === 'success'
+      ? 'success-portal'
+      : authState === 'error'
+      ? 'error-shake'
+      : ''
+  }`;
 
   return (
     <div className="auth-wrapper">
@@ -66,7 +83,10 @@ const Login = () => {
         </button>
       </div>
 
-      <div className="auth-card">
+      <div className={cardClass}>
+        {/* Holographic Laser Scanline during Authentication */}
+        {authState === 'scanning' && <div className="auth-scanline-beam"></div>}
+
         <div className="auth-header">
           <div className="auth-logo">
             <BrandLogo size={56} glow={true} />
@@ -97,6 +117,7 @@ const Login = () => {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
+              disabled={authState === 'scanning' || authState === 'success'}
             />
           </div>
 
@@ -115,6 +136,7 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 style={{ paddingRight: '42px' }}
                 required
+                disabled={authState === 'scanning' || authState === 'success'}
               />
               <button
                 type="button"
@@ -142,12 +164,20 @@ const Login = () => {
 
           <button
             type="submit"
-            disabled={loading}
-            className="btn btn-primary btn-full"
+            disabled={authState === 'scanning' || authState === 'success'}
+            className={`btn btn-primary btn-full ${authState === 'success' ? 'btn-auth-success' : ''}`}
             style={{ marginTop: 12, height: '44px', gap: 10, fontSize: '0.9rem' }}
           >
-            {loading ? (
-              <span>Authenticating...</span>
+            {authState === 'scanning' ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                <span>Verifying ZT-Credentials...</span>
+              </>
+            ) : authState === 'success' ? (
+              <>
+                <CheckCircle2 size={18} />
+                <span>Identity Verified ✓</span>
+              </>
             ) : (
               <>
                 <KeyRound size={18} />

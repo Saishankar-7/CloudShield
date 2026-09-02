@@ -1770,3 +1770,88 @@ select option:checked {
   right: 24px;
   z-index: 20;
 }
+
+/* ==========================================================================
+   INTERACTIVE AUTHENTICATION SCAN & GATEWAY TRANSITIONS
+   ========================================================================== */
+
+.auth-card.scanning {
+  box-shadow: var(--shadow-lg), 0 0 45px rgba(14, 165, 233, 0.45);
+  border-color: rgba(14, 165, 233, 0.5);
+  transition: all 0.3s ease;
+}
+
+.auth-scanline-beam {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, #38bdf8 50%, transparent 100%);
+  box-shadow: 0 0 12px #38bdf8, 0 0 24px #38bdf8;
+  animation: cardScanline 1.4s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 25;
+}
+
+@keyframes cardScanline {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.auth-card.success-portal {
+  animation: authSuccessPortal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 60px rgba(16, 185, 129, 0.5) !important;
+}
+
+@keyframes authSuccessPortal {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+  50% {
+    transform: scale(1.025);
+    box-shadow: 0 0 50px rgba(16, 185, 129, 0.6);
+  }
+  100% {
+    transform: scale(1.04);
+    opacity: 0.95;
+  }
+}
+
+.auth-card.error-shake {
+  animation: lockShake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  border-color: #ef4444 !important;
+}
+
+@keyframes lockShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  15%, 45%, 75% {
+    transform: translateX(-8px);
+  }
+  30%, 60%, 90% {
+    transform: translateX(8px);
+  }
+}
+
+.btn-auth-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.5) !important;
+  border-color: #34d399 !important;
+}
