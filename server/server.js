@@ -29,6 +29,56 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 const path = require('path');
+const mongoose = require('mongoose');
+const { startKeepAlive } = require('./services/keepAliveService');
+
+// Format uptime into human-readable string
+const formatUptime = (seconds) => {
+  const d = Math.floor(seconds / (3600 * 24));
+  const h = Math.floor((seconds % (3600 * 24)) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  return `${d > 0 ? d + 'd ' : ''}${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`;
+};
+
+const getHealthStatus = () => {
+  const dbState = mongoose.connection.readyState;
+  const dbStatusMap = {
+    0: 'Disconnected',
+    1: 'Connected',
+    2: 'Connecting',
+    3: 'Disconnecting'
+  };
+
+  const isHealthy = dbState === 1 || dbState === 2;
+
+  return {
+    status: isHealthy ? 'HEALTHY' : 'DEGRADED',
+    service: 'CloudShield Zero-Trust Security Gateway API',
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+    uptimeFormatted: formatUptime(process.uptime()),
+    database: {
+      status: dbStatusMap[dbState] || 'Unknown',
+      connected: dbState === 1
+    },
+    gateway: {
+      zeroTrustEngine: 'ACTIVE',
+      policyEngine: 'ACTIVE',
+      riskEngine: 'ACTIVE',
+      mfaService: 'NODEMAILER_ENABLED'
+    },
+    system: {
+      nodeVersion: process.version,
+      platform: process.platform,
+      memoryUsageMB: Math.round(process.memoryUsage().rss / 1024 / 1024)
+    },
+    renderKeepAlive: {
+      enabled: !!(process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || process.env.RENDER_URL),
+      targetUrl: process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || process.env.RENDER_URL || 'Ready for UptimeRobot / external cron'
+    }
+  };
+};
 
 // Enable CORS and JSON parsing (with support for PDF attachments)
 app.use(cors());
@@ -56,13 +106,32 @@ app.use('/api/users', userRoutes);
 app.use('/api/risk', riskRoutes);
 app.use('/api/reports', reportRoutes);
 
-// Base & Health Check routes (for Render liveness checks)
-app.get('/', (req, res) => {
-  res.send('Zero Trust Cloud Security (CloudShield) API is running.');
+// Health Check & Uptime Monitoring Routes (for Render, UptimeRobot, and Cron jobs)
+app.get('/health', (req, res) => {
+  res.status(200).json(getHealthStatus());
 });
 
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', service: 'CloudShield API', timestamp: new Date().toISOString() });
+  res.status(200).json(getHealthStatus());
+});
+
+app.get('/api/status', (req, res) => {
+  res.status(200).json(getHealthStatus());
+});
+
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
+// Base Route
+app.get('/', (req, res) => {
+  res.status(200).json({
+    service: 'CloudShield Zero-Trust Cloud Access Security Architecture',
+    status: 'ONLINE',
+    version: '2.0.0',
+    healthCheck: '/health',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Central Error Handler Middleware
@@ -76,4 +145,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   logger.info(`CloudShield backend listening on port ${PORT}`);
+  // Start the background keep-alive heartbeat engine for Render
+  startKeepAlive();
 });
