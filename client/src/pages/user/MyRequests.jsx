@@ -3,6 +3,7 @@ import { apiFetch } from '../../services/api';
 import DataTable from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
 import RiskBadge from '../../components/RiskBadge';
+import BrandLogo from '../../components/BrandLogo';
 import { Inbox, Calendar } from 'lucide-react';
 
 const MyRequests = () => {
@@ -46,7 +47,10 @@ const MyRequests = () => {
   return (
     <div className="content-body">
       <div className="page-header">
-        <h1 className="page-title">Access Request History</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandLogo size={26} glow={true} />
+          <h1 className="page-title">Access Request History</h1>
+        </div>
         <p className="page-subtitle">Track, monitor, and check approval states of restricted resources</p>
       </div>
 

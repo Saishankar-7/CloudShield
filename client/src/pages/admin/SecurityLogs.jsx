@@ -3,6 +3,7 @@ import { apiFetch } from '../../services/api';
 import DataTable from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
 import RiskBadge from '../../components/RiskBadge';
+import BrandLogo from '../../components/BrandLogo';
 import { Terminal, Shield, Globe, Monitor } from 'lucide-react';
 
 const SecurityLogs = () => {
@@ -48,7 +49,10 @@ const SecurityLogs = () => {
   return (
     <div className="content-body">
       <div className="page-header">
-        <h1 className="page-title">Enterprise Security Audit Logs</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandLogo size={26} glow={true} />
+          <h1 className="page-title">Enterprise Security Audit Logs</h1>
+        </div>
         <p className="page-subtitle">Immutable chronological ledger of authentication, authorization, and policy enforcement events</p>
       </div>
 

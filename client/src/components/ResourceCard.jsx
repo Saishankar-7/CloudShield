@@ -86,16 +86,28 @@ const ResourceCard = ({ resource, onAccess, onRequestAccess }) => {
   const renderActionButton = () => {
     if (decision === 'Allow') {
       return (
-        <button onClick={() => onAccess(resource)} className="btn btn-access">
-          {isCloudPdf ? 'View PDF' : 'Access'}
+        <button onClick={() => onAccess(resource)} className="action-btn action-btn-primary" style={{ padding: '6px 16px', borderRadius: '20px' }}>
+          {isCloudPdf ? <FileText size={13} /> : null}
+          <span>{isCloudPdf ? 'View PDF' : 'Access Resource'}</span>
         </button>
       );
     }
 
     if (decision === 'MFA_Required') {
       return (
-        <button onClick={() => onAccess(resource)} className="btn btn-access" style={{ backgroundColor: 'var(--warning)', borderColor: 'var(--warning)' }}>
-          Verify MFA
+        <button
+          onClick={() => onAccess(resource)}
+          className="action-btn"
+          style={{
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            color: '#ffffff',
+            padding: '6px 16px',
+            borderRadius: '20px',
+            boxShadow: '0 2px 6px rgba(217, 119, 6, 0.25)',
+          }}
+        >
+          <KeyRound size={13} />
+          <span>Verify MFA</span>
         </button>
       );
     }
@@ -103,15 +115,15 @@ const ResourceCard = ({ resource, onAccess, onRequestAccess }) => {
     // decision === 'Deny'
     if (requestStatus === 'Pending') {
       return (
-        <button className="btn btn-secondary btn-sm" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-          Request Pending
-        </button>
+        <span className="action-btn action-btn-secondary" style={{ opacity: 0.7, cursor: 'not-allowed', borderRadius: '20px' }}>
+          <span>Request Pending</span>
+        </span>
       );
     }
 
     return (
-      <button onClick={() => onRequestAccess(resource)} className="btn btn-primary btn-sm">
-        Request Access
+      <button onClick={() => onRequestAccess(resource)} className="action-btn action-btn-secondary" style={{ borderRadius: '20px' }}>
+        <span>Request Access</span>
       </button>
     );
   };

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="shieldGrad" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="16" y1="12" x2="48" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <filter id="shadow" x="0" y="2" width="64" height="60" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#3b82f6" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Outer Shield Base with Shadow -->
+  <path d="M32 4L10 14V30C10 44.5 19.5 54.8 32 60C44.5 54.8 54 44.5 54 30V14L32 4Z" 
+        fill="url(#shieldGrad)" 
+        filter="url(#shadow)" />
+
+  <!-- Inner Gloss Layer -->
+  <path d="M32 7L13 15.5V30C13 42.5 21.2 51.5 32 56V7Z" 
+        fill="url(#glowGrad)" />
+
+  <!-- Security Padlock / Core Crest -->
+  <g transform="translate(20, 20)">
+    <!-- Lock Shackle -->
+    <path d="M6 11V7C6 3.686 8.686 1 12 1C15.314 1 18 3.686 18 7V11" 
+          stroke="#ffffff" 
+          stroke-width="3" 
+          stroke-linecap="round" />
+    <!-- Lock Body -->
+    <rect x="3" y="10" width="18" height="13" rx="3" fill="#ffffff" />
+    <!-- Keyhole -->
+    <circle cx="12" cy="15" r="2" fill="#312e81" />
+    <path d="M11 15.5H13V19H11V15.5Z" fill="#312e81" />
+  </g>
+</svg>

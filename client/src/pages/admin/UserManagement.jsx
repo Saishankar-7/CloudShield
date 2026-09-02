@@ -3,6 +3,7 @@ import { apiFetch } from '../../services/api';
 import DataTable from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
 import RiskBadge from '../../components/RiskBadge';
+import BrandLogo from '../../components/BrandLogo';
 import {
   Users,
   UserPlus,
@@ -212,7 +213,10 @@ const UserManagement = () => {
     <div className="content-body">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <h1 className="page-title">User Security Management</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <BrandLogo size={26} glow={true} />
+            <h1 className="page-title">User Security Management</h1>
+          </div>
           <p className="page-subtitle">Manage employee access privileges, adjust risk levels, and block accounts directly in MongoDB</p>
         </div>
         <button
@@ -427,25 +431,25 @@ const UserManagement = () => {
                   )}
                 </td>
                 <td>
-                  {uItem.role === 'admin' ? (
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      style={{ padding: '6px 8px', opacity: 0.45, cursor: 'not-allowed' }}
-                      disabled
-                      title="Administrator accounts cannot be deleted"
-                    >
-                      <Lock size={14} />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setUserToDelete(uItem)}
-                      className="btn btn-danger btn-sm"
-                      style={{ padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 4 }}
-                      title="Delete User from Database"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
+                  <div className="action-btn-group">
+                    {uItem.role === 'admin' ? (
+                      <span
+                        className="action-btn action-btn-secondary action-btn-icon"
+                        style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                        title="Administrator accounts cannot be deleted"
+                      >
+                        <Lock size={13} />
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setUserToDelete(uItem)}
+                        className="action-btn action-btn-danger action-btn-icon"
+                        title="Delete User from Database"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             )}

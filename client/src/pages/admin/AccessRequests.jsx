@@ -3,6 +3,7 @@ import { apiFetch } from '../../services/api';
 import DataTable from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
 import RiskBadge from '../../components/RiskBadge';
+import BrandLogo from '../../components/BrandLogo';
 import { Inbox, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 const AccessRequests = () => {
@@ -82,7 +83,10 @@ const AccessRequests = () => {
   return (
     <div className="content-body">
       <div className="page-header">
-        <h1 className="page-title">Access Request Approvals Queue</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandLogo size={26} glow={true} />
+          <h1 className="page-title">Access Request Approvals Queue</h1>
+        </div>
         <p className="page-subtitle">Review, authorize, or deny employee requests for restricted cloud assets</p>
       </div>
 
@@ -117,22 +121,24 @@ const AccessRequests = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <StatusBadge status={req.status} />
                     {req.status === 'Pending' && (
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div className="action-btn-group" style={{ marginLeft: 6 }}>
                         <button
                           onClick={() => handleReviewAction(req, 'Approved')}
-                          className="btn btn-success btn-sm"
-                          style={{ padding: '4px 8px', borderRadius: '4px' }}
+                          className="action-btn action-btn-success"
+                          style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                           title="Approve Request"
                         >
                           <ThumbsUp size={12} />
+                          <span>Approve</span>
                         </button>
                         <button
                           onClick={() => handleReviewAction(req, 'Denied')}
-                          className="btn btn-danger btn-sm"
-                          style={{ padding: '4px 8px', borderRadius: '4px' }}
+                          className="action-btn action-btn-danger"
+                          style={{ padding: '4px 10px', fontSize: '0.75rem' }}
                           title="Deny Request"
                         >
                           <ThumbsDown size={12} />
+                          <span>Deny</span>
                         </button>
                       </div>
                     )}

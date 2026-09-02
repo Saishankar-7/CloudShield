@@ -4,6 +4,7 @@ import { apiFetch } from '../../services/api';
 import StatCard from '../../components/StatCard';
 import ResourceCard from '../../components/ResourceCard';
 import StatusBadge from '../../components/StatusBadge';
+import BrandLogo from '../../components/BrandLogo';
 import {
   Shield,
   CheckCircle,
@@ -20,7 +21,11 @@ import {
   ExternalLink,
   Cloud,
   HardDrive,
-  Search
+  Search,
+  Mail,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -29,11 +34,18 @@ const Dashboard = () => {
   const [resources, setResources] = useState([]);
   const [logs, setLogs] = useState([]);
   
-  // Modals state
+  // Modals state & Email OTP MFA state
   const [activeModal, setActiveModal] = useState(null); // 'access' | 'mfa' | 'request' | null
   const [selectedRes, setSelectedRes] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
   const [mfaError, setMfaError] = useState('');
+  const [mfaSuccess, setMfaSuccess] = useState('');
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpEmail, setOtpEmail] = useState('');
+  const [otpMaskedEmail, setOtpMaskedEmail] = useState('');
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const [mfaVerifying, setMfaVerifying] = useState(false);
   const [requestReason, setRequestReason] = useState('');
   const [requestType, setRequestType] = useState('Read Only');
   const [requestSuccess, setRequestSuccess] = useState(false);
@@ -52,6 +64,14 @@ const Dashboard = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Timer countdown for resend OTP cooldown
+  useEffect(() => {
+    if (otpCooldown > 0) {
+      const timer = setTimeout(() => setOtpCooldown(otpCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCooldown]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -97,23 +117,72 @@ const Dashboard = () => {
     return true;
   });
 
+  // Request MFA OTP to registered email address
+  const sendMfaOtp = async (resource) => {
+    const resId = resource?._id || selectedRes?._id;
+    if (!resId) return;
+
+    setOtpSending(true);
+    setMfaError('');
+    setMfaSuccess('');
+
+    try {
+      const data = await apiFetch(`/resources/${resId}/request-otp`, {
+        method: 'POST',
+      });
+
+      setOtpSent(true);
+      setOtpEmail(data.email || '');
+      setOtpMaskedEmail(data.maskedEmail || data.email || '');
+      setOtpCooldown(45); // 45s cooldown
+      setMfaSuccess(`Security OTP has been sent to your registered email (${data.maskedEmail || data.email})`);
+    } catch (err) {
+      setMfaError(err.message || 'Failed to send OTP to registered email.');
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
   // Triggered when clicking "Access" or "Verify MFA"
   const handleAccessResource = async (resource) => {
     setSelectedRes(resource);
     setErrorCleanups();
+    setMfaSuccess('');
+    setMfaCode('');
+    setOtpSent(false);
 
-    if (resource.decision === 'MFA_Required') {
-      // Trigger MFA verification modal
+    // Any document/cloud PDF or MFA_Required resource triggers the MFA Email OTP challenge
+    const isDocOrMfa =
+      resource.decision === 'MFA_Required' ||
+      resource.type === 'Document' ||
+      resource.type === 'PDF Document' ||
+      resource.cloudStorage?.isCloudPdf ||
+      resource.sensitivity === 'High' ||
+      resource.sensitivity === 'Critical';
+
+    if (isDocOrMfa) {
+      // Trigger MFA verification modal and send OTP
       setActiveModal('mfa');
+      sendMfaOtp(resource);
     } else {
       // Directly fetch resource contents
       try {
         const data = await apiFetch(`/resources/${resource._id}`);
+        if (data.status === 'MFA_Required') {
+          setActiveModal('mfa');
+          sendMfaOtp(resource);
+          return;
+        }
         setAccessData(data.resource);
         setActiveModal('access');
         fetchDashboardData(); // update stats/logs
       } catch (err) {
-        alert(err.message || 'Access Denied.');
+        if (err.message && err.message.toLowerCase().includes('mfa')) {
+          setActiveModal('mfa');
+          sendMfaOtp(resource);
+        } else {
+          alert(err.message || 'Access Denied.');
+        }
       }
     }
   };
@@ -122,25 +191,33 @@ const Dashboard = () => {
   const handleMfaSubmit = async (e) => {
     e.preventDefault();
     setMfaError('');
+    setMfaSuccess('');
 
-    if (mfaCode === '123456') {
+    if (!mfaCode || mfaCode.trim().length !== 6) {
+      setMfaError('Please enter the full 6-digit OTP code.');
+      return;
+    }
+
+    setMfaVerifying(true);
+
+    try {
+      const data = await apiFetch(`/resources/${selectedRes._id}/verify-otp`, {
+        method: 'POST',
+        body: { otp: mfaCode.trim() },
+      });
+
       // Set verification flag in session headers
       localStorage.setItem('sim_mfa_verified', 'true');
       setSimMfa(true);
-
-      try {
-        const data = await apiFetch(`/resources/${selectedRes._id}`);
-        setAccessData(data.resource);
-        setActiveModal('access');
-        setMfaCode('');
-        fetchDashboardData();
-      } catch (err) {
-        setMfaError(err.message || 'MFA validation failed.');
-        localStorage.setItem('sim_mfa_verified', 'false');
-        setSimMfa(false);
-      }
-    } else {
-      setMfaError('Invalid MFA verification code. Use code 123456.');
+      setAccessData(data.resource);
+      setActiveModal('access');
+      setMfaCode('');
+      setMfaSuccess('');
+      fetchDashboardData();
+    } catch (err) {
+      setMfaError(err.message || 'MFA validation failed. Check your OTP and try again.');
+    } finally {
+      setMfaVerifying(false);
     }
   };
 
@@ -238,7 +315,10 @@ const Dashboard = () => {
     <div className="content-body">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div className="page-header" style={{ marginBottom: 0 }}>
-          <h1 className="page-title">Employee Security Terminal</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <BrandLogo size={26} glow={true} />
+            <h1 className="page-title">Employee Security Terminal</h1>
+          </div>
           <p className="page-subtitle">Continuous Zero Trust access evaluation</p>
         </div>
 
@@ -630,44 +710,131 @@ const Dashboard = () => {
       {/* 2. Modal: MFA Verification Challenge */}
       {activeModal === 'mfa' && selectedRes && (
         <div className="modal-overlay" onClick={() => setActiveModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 style={{ fontSize: '1.1rem', color: 'var(--warning-text)' }}>🔒 Identity Verification Required</h2>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <KeyRound size={20} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.05rem', margin: 0, fontWeight: 700, color: 'var(--text-primary)' }}>MFA Document Verification</h2>
+                  <p style={{ margin: 0, fontSize: '0.725rem', color: 'var(--text-muted)' }}>Zero Trust Continuous Identity Gate</p>
+                </div>
+              </div>
               <button className="navbar-btn" onClick={() => setActiveModal(null)}>✕</button>
             </div>
+
             <form onSubmit={handleMfaSubmit}>
-              <div className="modal-body">
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: 20 }}>
-                  Accessing <b>{selectedRes.name}</b> requires multi-factor authentication due to resource sensitivity ({selectedRes.sensitivity}).
-                </p>
+              <div className="modal-body" style={{ paddingTop: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.675rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600, display: 'block' }}>Document</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedRes.name}</span>
+                  </div>
+                  <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>MFA Required</span>
+                </div>
+
+                {/* Email Delivery Status Card */}
+                <div style={{ border: '1px solid #bae6fd', backgroundColor: '#f0f9ff', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <Mail size={18} style={{ color: '#0284c7', marginTop: 2, flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0369a1', display: 'block' }}>
+                        OTP Sent to Registered Email Address
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: '#0c4a6e', display: 'block', marginTop: 2 }}>
+                        A single-use 6-digit verification code was sent to: <strong>{otpMaskedEmail || otpEmail || user?.email || 'your registered email'}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e0f2fe', paddingTop: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.72rem', color: '#0369a1' }}>
+                      <Clock size={13} />
+                      <span>Code valid for 10 mins</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => sendMfaOtp(selectedRes)}
+                      disabled={otpCooldown > 0 || otpSending}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: otpCooldown > 0 ? '#94a3b8' : 'var(--primary)',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        cursor: otpCooldown > 0 || otpSending ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '2px 6px',
+                      }}
+                    >
+                      <RefreshCw size={12} className={otpSending ? 'animate-spin' : ''} />
+                      <span>{otpSending ? 'Sending...' : otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Resend Code'}</span>
+                    </button>
+                  </div>
+                </div>
 
                 {mfaError && (
-                  <div style={{ color: 'var(--danger-text)', backgroundColor: 'var(--danger-bg)', padding: '10px 14px', borderRadius: '8px', marginBottom: 16, fontSize: '0.8rem', fontWeight: 500 }}>
-                    {mfaError}
+                  <div style={{ color: 'var(--danger-text)', backgroundColor: 'var(--danger-bg)', padding: '10px 14px', borderRadius: '8px', marginBottom: 14, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                    <span>{mfaError}</span>
                   </div>
                 )}
 
-                <div className="form-group" style={{ textAlign: 'center' }}>
-                  <label className="form-label">Enter 6-Digit OTP</label>
+                {mfaSuccess && (
+                  <div style={{ color: '#065f46', backgroundColor: '#d1fae5', border: '1px solid #a7f3d0', padding: '10px 14px', borderRadius: '8px', marginBottom: 14, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <CheckCircle2 size={16} style={{ flexShrink: 0, color: '#059669' }} />
+                    <span>{mfaSuccess}</span>
+                  </div>
+                )}
+
+                <div className="form-group" style={{ textAlign: 'center', marginBottom: 12 }}>
+                  <label className="form-label" style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>Enter 6-Digit Email OTP</label>
                   <input
                     className="form-input"
                     type="text"
                     maxLength="6"
-                    placeholder="123456"
-                    style={{ fontSize: '1.5rem', letterSpacing: '6px', textAlign: 'center', fontFamily: 'monospace', width: '180px', margin: '0 auto', display: 'block' }}
+                    placeholder="• • • • • •"
+                    style={{
+                      fontSize: '1.6rem',
+                      letterSpacing: '8px',
+                      textAlign: 'center',
+                      fontFamily: 'monospace',
+                      width: '200px',
+                      margin: '0 auto',
+                      display: 'block',
+                      fontWeight: 700,
+                      height: '46px',
+                    }}
                     value={mfaCode}
                     onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
                     required
+                    autoFocus
                   />
                 </div>
-
-                <div style={{ marginTop: 16, padding: '12px', border: '1px dashed #f59e0b', backgroundColor: '#fffbeb', borderRadius: '8px', fontSize: '0.725rem', color: '#92400e', lineHeight: 1.3 }}>
-                  <b>Testing Code:</b> Enter bypass code <code>123456</code> to verify this challenge.
-                </div>
               </div>
-              <div className="modal-footer">
+
+              <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setActiveModal(null)}>Cancel</button>
-                <button type="submit" className="btn btn-primary btn-sm" style={{ backgroundColor: 'var(--warning)' }}>Verify & Access</button>
+                <button
+                  type="submit"
+                  disabled={mfaVerifying || !mfaCode}
+                  className="btn btn-primary btn-sm"
+                  style={{
+                    backgroundColor: 'var(--primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    minWidth: '140px',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Shield size={14} />
+                  <span>{mfaVerifying ? 'Verifying OTP...' : 'Verify & Unlock'}</span>
+                </button>
               </div>
             </form>
           </div>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Shield, UserPlus, AlertCircle } from 'lucide-react';
+import BrandLogo from '../../components/BrandLogo';
+import { UserPlus, AlertCircle } from 'lucide-react';
 
 const Register = () => {
   const [fullName, setFullName] = useState('');
@@ -44,8 +45,8 @@ const Register = () => {
     <div className="auth-wrapper">
       <div className="auth-card" style={{ maxWidth: '500px' }}>
         <div className="auth-header">
-          <div className="auth-logo">
-            <Shield size={28} />
+          <div className="auth-logo" style={{ background: 'none', boxShadow: 'none' }}>
+            <BrandLogo size={52} glow={true} />
           </div>
           <h1 className="auth-title">Register with CloudShield</h1>
           <p className="auth-subtitle">Establish your Zero Trust employee profile</p>
@@ -84,7 +85,7 @@ const Register = () => {
               className="form-input"
               type="email"
               id="email"
-              placeholder="e.g. sai@company.com"
+              placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -97,7 +98,7 @@ const Register = () => {
               className="form-input"
               type="password"
               id="password"
-              placeholder="Min. 8 characters"
+              placeholder="******"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

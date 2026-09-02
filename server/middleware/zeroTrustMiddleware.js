@@ -104,7 +104,15 @@ const zeroTrustCheck = async (req, res, next) => {
     }
 
     if (decision === 'MFA_Required') {
-      const mfaVerified = req.headers['x-mfa-verified'] === 'true';
+      const DocumentOtp = require('../models/DocumentOtp');
+      const recentOtpVerified = await DocumentOtp.findOne({
+        user: user._id,
+        resource: resource._id,
+        verified: true,
+        updatedAt: { $gt: new Date(Date.now() - 15 * 60 * 1000) },
+      });
+
+      const mfaVerified = req.headers['x-mfa-verified'] === 'true' || !!recentOtpVerified;
 
       if (!mfaVerified) {
         await loggingService.logEvent({

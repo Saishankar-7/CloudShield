@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiFetch, apiUpload } from '../../services/api';
 import DataTable from '../../components/DataTable';
 import RiskBadge from '../../components/RiskBadge';
+import BrandLogo from '../../components/BrandLogo';
 import {
   FolderLock,
   Plus,
@@ -50,6 +51,96 @@ const Resources = () => {
   const [uploadedBase64, setUploadedBase64] = useState('');
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+
+  // Admin Access Control & Permission Management State
+  const [managingAccessRes, setManagingAccessRes] = useState(null);
+  const [accessDepts, setAccessDepts] = useState(['All']);
+  const [accessRoles, setAccessRoles] = useState(['admin', 'employee', 'manager']);
+  const [accessMfa, setAccessMfa] = useState('Always Required');
+  const [accessDownload, setAccessDownload] = useState(true);
+  const [accessStatus, setAccessStatus] = useState('Active');
+  const [accessSensitivity, setAccessSensitivity] = useState('Low');
+  const [accessSaving, setAccessSaving] = useState(false);
+  const [accessSuccess, setAccessSuccess] = useState('');
+  const [accessError, setAccessError] = useState('');
+
+  const ALL_DEPARTMENTS = ['All', 'Engineering', 'Security', 'Finance', 'HR', 'Operations', 'Sales', 'Executive', 'Legal'];
+  const ALL_ROLES = [
+    { id: 'admin', label: 'Administrator' },
+    { id: 'employee', label: 'Employee' },
+    { id: 'manager', label: 'Manager' },
+  ];
+
+  const handleOpenAccessModal = (res) => {
+    setManagingAccessRes(res);
+    setAccessDepts(res.allowedDepartments && res.allowedDepartments.length > 0 ? res.allowedDepartments : ['All']);
+    setAccessRoles(res.allowedRoles && res.allowedRoles.length > 0 ? res.allowedRoles : ['admin', 'employee', 'manager']);
+    setAccessMfa(res.mfaRequirement || 'Always Required');
+    setAccessDownload(res.downloadAllowed !== undefined ? res.downloadAllowed : true);
+    setAccessStatus(res.accessStatus || 'Active');
+    setAccessSensitivity(res.sensitivity || 'Low');
+    setAccessSuccess('');
+    setAccessError('');
+  };
+
+  const handleToggleDept = (dept) => {
+    if (dept === 'All') {
+      setAccessDepts(['All']);
+      return;
+    }
+    let newDepts = accessDepts.filter((d) => d !== 'All');
+    if (newDepts.includes(dept)) {
+      newDepts = newDepts.filter((d) => d !== dept);
+      if (newDepts.length === 0) newDepts = ['All'];
+    } else {
+      newDepts.push(dept);
+    }
+    setAccessDepts(newDepts);
+  };
+
+  const handleToggleRole = (role) => {
+    if (accessRoles.includes(role)) {
+      if (accessRoles.length > 1) {
+        setAccessRoles(accessRoles.filter((r) => r !== role));
+      }
+    } else {
+      setAccessRoles([...accessRoles, role]);
+    }
+  };
+
+  const handleSaveAccess = async (e) => {
+    e.preventDefault();
+    if (!managingAccessRes) return;
+    setAccessSaving(true);
+    setAccessError('');
+    setAccessSuccess('');
+
+    try {
+      const data = await apiFetch(`/resources/${managingAccessRes._id}/access`, {
+        method: 'PUT',
+        body: {
+          allowedDepartments: accessDepts,
+          allowedRoles: accessRoles,
+          mfaRequirement: accessMfa,
+          downloadAllowed: accessDownload,
+          accessStatus: accessStatus,
+          sensitivity: accessSensitivity,
+          status: accessStatus === 'Active' ? 'Protected' : accessStatus === 'Restricted' ? 'Restricted' : 'Restricted',
+        },
+      });
+
+      setAccessSuccess(data.message || 'Resource access rules updated successfully.');
+      fetchResources();
+      setTimeout(() => {
+        setManagingAccessRes(null);
+        setAccessSuccess('');
+      }, 1000);
+    } catch (err) {
+      setAccessError(err.message || 'Failed to update access rules.');
+    } finally {
+      setAccessSaving(false);
+    }
+  };
 
   useEffect(() => {
     fetchResources();
@@ -212,10 +303,11 @@ const Resources = () => {
     'Resource Name',
     'Identifier URL/Path',
     'Type & Cloud Provider',
-    'Category Group',
-    'Owner Department',
+    'Owner Dept',
+    'Allowed Depts',
     'Sensitivity',
-    'Default Policy Status',
+    'MFA Policy',
+    'Access Status',
     'Actions'
   ];
 
@@ -223,8 +315,11 @@ const Resources = () => {
     <div className="content-body">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1 className="page-title">Enterprise Security Catalog</h1>
-          <p className="page-subtitle">Configure cloud resources, endpoints, and register secure Cloud Storage PDF documents</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <BrandLogo size={26} glow={true} />
+            <h1 className="page-title">Enterprise Security Catalog</h1>
+          </div>
+          <p className="page-subtitle">Configure cloud resources, endpoints, access control policies, and MFA gates</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -240,7 +335,7 @@ const Resources = () => {
         <div className="card-title-bar" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 16 }}>
           <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <FolderLock size={20} style={{ color: 'var(--primary)' }} />
-            <span>Secure Catalog Assets ({resources.length})</span>
+            <span>Secure Catalog Assets & Access Control ({resources.length})</span>
           </h2>
         </div>
 
@@ -264,7 +359,7 @@ const Resources = () => {
                     <span style={{ fontWeight: 700 }}>{res.name}</span>
                   </div>
                 </td>
-                <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {res.identifier}
                 </td>
                 <td>
@@ -284,36 +379,71 @@ const Resources = () => {
                     <span>{res.type}</span>
                   )}
                 </td>
-                <td>{res.category}</td>
                 <td style={{ fontWeight: 500 }}>{res.owner}</td>
+                <td>
+                  <span className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
+                    {res.allowedDepartments?.length > 0
+                      ? res.allowedDepartments.includes('All')
+                        ? 'All Depts'
+                        : `${res.allowedDepartments.length} Depts`
+                      : 'All Depts'}
+                  </span>
+                </td>
                 <td>
                   <RiskBadge level={res.sensitivity} />
                 </td>
                 <td>
-                  <span className={`badge ${res.status === 'Restricted' ? 'badge-danger' : 'badge-success'}`}>
-                    {res.status}
+                  <span
+                    className="badge"
+                    style={{
+                      fontSize: '0.72rem',
+                      backgroundColor: res.mfaRequirement === 'Disabled' ? '#f1f5f9' : '#eff6ff',
+                      color: res.mfaRequirement === 'Disabled' ? '#64748b' : '#2563eb',
+                      border: res.mfaRequirement === 'Disabled' ? '1px solid #cbd5e1' : '1px solid #bfdbfe',
+                    }}
+                  >
+                    {res.mfaRequirement || 'Always Required'}
                   </span>
                 </td>
                 <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span
+                    className={`badge ${
+                      res.accessStatus === 'Revoked'
+                        ? 'badge-danger'
+                        : res.accessStatus === 'Restricted'
+                        ? 'badge-warning'
+                        : 'badge-success'
+                    }`}
+                  >
+                    {res.accessStatus || 'Active'}
+                  </span>
+                </td>
+                <td>
+                  <div className="action-btn-group">
+                    <button
+                      onClick={() => handleOpenAccessModal(res)}
+                      className="action-btn action-btn-primary"
+                      title="Manage Access Control & Permissions"
+                    >
+                      <Shield size={13} />
+                      <span>Manage Access</span>
+                    </button>
                     {res.cloudStorage?.isCloudPdf && (
                       <button
                         onClick={() => setViewingCloudAsset(res)}
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '6px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.75rem' }}
+                        className="action-btn action-btn-secondary"
                         title="View Cloud PDF Details"
                       >
                         <Eye size={13} />
-                        <span>Cloud PDF</span>
+                        <span>View PDF</span>
                       </button>
                     )}
                     <button
                       onClick={() => handleDeleteResource(res._id)}
-                      className="btn btn-danger btn-sm"
-                      style={{ padding: '6px', borderRadius: '4px' }}
+                      className="action-btn action-btn-danger action-btn-icon"
                       title="Delete Resource"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 </td>
@@ -798,6 +928,215 @@ const Resources = () => {
             <div className="modal-footer">
               <button className="btn btn-secondary btn-sm" onClick={() => setViewingCloudAsset(null)}>Close</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Manage Resource Access & Permissions */}
+      {managingAccessRes && (
+        <div className="modal-overlay" onClick={() => setManagingAccessRes(null)}>
+          <div className="modal-content" style={{ maxWidth: '620px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '14px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Shield size={18} style={{ color: 'var(--primary)' }} />
+                  <h2 style={{ fontSize: '1.15rem', margin: 0, fontWeight: 700 }}>
+                    Manage Access: {managingAccessRes.name}
+                  </h2>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Category: <b>{managingAccessRes.category}</b> • Type: <b>{managingAccessRes.type}</b> • Owner: <b>{managingAccessRes.owner}</b>
+                </p>
+              </div>
+              <button className="navbar-btn" onClick={() => setManagingAccessRes(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAccess}>
+              <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {accessError && (
+                  <div style={{ color: 'var(--danger-text)', backgroundColor: 'var(--danger-bg)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.8rem' }}>
+                    {accessError}
+                  </div>
+                )}
+
+                {accessSuccess && (
+                  <div style={{ color: '#065f46', backgroundColor: '#d1fae5', border: '1px solid #a7f3d0', padding: '10px 14px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600 }}>
+                    {accessSuccess}
+                  </div>
+                )}
+
+                {/* Access Status Section */}
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                    Resource Access Status
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                    {[
+                      { id: 'Active', label: 'Active', desc: 'Available to permitted users', color: '#059669', bg: '#f0fdf4' },
+                      { id: 'Restricted', label: 'Restricted', desc: 'Requires step-up approval', color: '#d97706', bg: '#fffbeb' },
+                      { id: 'Revoked', label: 'Revoked', desc: 'Access blocked for all users', color: '#dc2626', bg: '#fef2f2' },
+                    ].map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => setAccessStatus(item.id)}
+                        style={{
+                          border: accessStatus === item.id ? `2px solid ${item.color}` : '1px solid var(--border-color)',
+                          backgroundColor: accessStatus === item.id ? item.bg : '#fff',
+                          borderRadius: '8px',
+                          padding: '10px',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: item.color }}>{item.label}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>{item.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* MFA Policy Section */}
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                    Multi-Factor Authentication (MFA) Requirement
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                    {[
+                      { id: 'Always Required', label: 'Always Required', desc: 'Send 6-digit Email OTP on every access' },
+                      { id: 'Risk-Based', label: 'Risk-Based', desc: 'Prompt OTP only if risk score > 30' },
+                      { id: 'Disabled', label: 'Disabled', desc: 'Direct access without OTP prompt' },
+                    ].map((mfa) => (
+                      <div
+                        key={mfa.id}
+                        onClick={() => setAccessMfa(mfa.id)}
+                        style={{
+                          border: accessMfa === mfa.id ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                          backgroundColor: accessMfa === mfa.id ? 'rgba(59, 130, 246, 0.08)' : '#fff',
+                          borderRadius: '8px',
+                          padding: '10px',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: '0.825rem', color: accessMfa === mfa.id ? 'var(--primary)' : 'var(--text-main)' }}>
+                          {mfa.label}
+                        </div>
+                        <div style={{ fontSize: '0.675rem', color: 'var(--text-muted)', marginTop: 2 }}>{mfa.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Allowed Departments (Pills) */}
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                    Allowed Departments
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {ALL_DEPARTMENTS.map((dept) => {
+                      const isSelected = accessDepts.includes(dept);
+                      return (
+                        <button
+                          key={dept}
+                          type="button"
+                          onClick={() => handleToggleDept(dept)}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: '20px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                            backgroundColor: isSelected ? 'var(--primary)' : '#f8fafc',
+                            color: isSelected ? '#fff' : 'var(--text-muted)',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {dept} {isSelected && '✓'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Allowed Roles (Pills) */}
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                    Allowed User Roles
+                  </label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {ALL_ROLES.map((role) => {
+                      const isSelected = accessRoles.includes(role.id);
+                      return (
+                        <button
+                          key={role.id}
+                          type="button"
+                          onClick={() => handleToggleRole(role.id)}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '8px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                            backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : '#f8fafc',
+                            color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                          }}
+                        >
+                          {role.label} {isSelected && '✓'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Sensitivity & Download Permissions */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600 }}>Classification Sensitivity</label>
+                    <select
+                      className="form-input"
+                      value={accessSensitivity}
+                      onChange={(e) => setAccessSensitivity(e.target.value)}
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600 }}>File Downloads</label>
+                    <select
+                      className="form-input"
+                      value={accessDownload ? 'true' : 'false'}
+                      onChange={(e) => setAccessDownload(e.target.value === 'true')}
+                    >
+                      <option value="true">Allowed for authorized users</option>
+                      <option value="false">Restricted (View-Only)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setManagingAccessRes(null)}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={accessSaving}
+                  className="btn btn-primary btn-sm"
+                  style={{ minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                >
+                  <Shield size={14} />
+                  <span>{accessSaving ? 'Saving Rules...' : 'Save Access Rules'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

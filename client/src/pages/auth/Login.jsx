@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Shield, KeyRound, AlertCircle } from 'lucide-react';
+import BrandLogo from '../../components/BrandLogo';
+import { KeyRound, AlertCircle } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -36,8 +37,8 @@ const Login = () => {
     <div className="auth-wrapper">
       <div className="auth-card">
         <div className="auth-header">
-          <div className="auth-logo">
-            <Shield size={28} />
+          <div className="auth-logo" style={{ background: 'none', boxShadow: 'none' }}>
+            <BrandLogo size={52} glow={true} />
           </div>
           <h1 className="auth-title">CloudShield Gateway</h1>
           <p className="auth-subtitle">Zero Trust secure enterprise authorization</p>
@@ -57,7 +58,7 @@ const Login = () => {
               className="form-input"
               type="email"
               id="email"
-              placeholder="e.g. sai@company.com"
+              placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

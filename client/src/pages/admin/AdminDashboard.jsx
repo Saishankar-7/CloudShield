@@ -4,6 +4,7 @@ import StatCard from '../../components/StatCard';
 import DataTable from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
 import RiskBadge from '../../components/RiskBadge';
+import BrandLogo from '../../components/BrandLogo';
 import {
   Users,
   Inbox,
@@ -148,7 +149,10 @@ const AdminDashboard = () => {
   return (
     <div className="content-body">
       <div className="page-header">
-        <h1 className="page-title">IT Security Operations Dashboard</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandLogo size={26} glow={true} />
+          <h1 className="page-title">IT Security Operations Dashboard</h1>
+        </div>
         <p className="page-subtitle">Real-time Zero Trust gateway overview and activity monitoring</p>
       </div>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../../services/api';
 import StatCard from '../../components/StatCard';
+import BrandLogo from '../../components/BrandLogo';
 import { BarChart3, TrendingUp, ShieldCheck, AlertOctagon, Terminal } from 'lucide-react';
 
 const ReportsAnalytics = () => {
@@ -33,7 +34,10 @@ const ReportsAnalytics = () => {
   return (
     <div className="content-body">
       <div className="page-header">
-        <h1 className="page-title">Enterprise Analytics & Reports</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandLogo size={26} glow={true} />
+          <h1 className="page-title">Enterprise Analytics & Reports</h1>
+        </div>
         <p className="page-subtitle">Security compliance logs, authentication rates, and risk trends breakdowns</p>
       </div>
 

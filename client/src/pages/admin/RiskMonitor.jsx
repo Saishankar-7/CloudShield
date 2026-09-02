@@ -3,6 +3,7 @@ import { apiFetch } from '../../services/api';
 import DataTable from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
 import RiskBadge from '../../components/RiskBadge';
+import BrandLogo from '../../components/BrandLogo';
 import { Activity, AlertTriangle, CheckCircle, Terminal, ClipboardEdit, Eye } from 'lucide-react';
 
 const RiskMonitor = () => {
@@ -80,7 +81,10 @@ const RiskMonitor = () => {
   return (
     <div className="content-body">
       <div className="page-header">
-        <h1 className="page-title">Continuous Threat & Risk Monitoring</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandLogo size={26} glow={true} />
+          <h1 className="page-title">Continuous Threat & Risk Monitoring</h1>
+        </div>
         <p className="page-subtitle">Inspect anomalous authentication logs, lockouts, and policy bypass warnings</p>
       </div>
 

@@ -13,6 +13,8 @@ const AccessLogSchema = new Schema(
         'Failed Login',
         'Logout',
         'MFA Verification',
+        'MFA OTP Sent',
+        'MFA Document Verification',
         'Access Resource',
         'Access Denied',
         'Download File',
@@ -32,7 +34,7 @@ const AccessLogSchema = new Schema(
     },
     accessAction: {
       type: String,
-      enum: ['Interactive', 'View', 'Query', 'Download', 'Upload', 'API Call', 'Admin'],
+      enum: ['Interactive', 'View', 'Query', 'Download', 'Upload', 'API Call', 'Admin', 'OTP Challenge'],
     },
 
     ipAddress: String,

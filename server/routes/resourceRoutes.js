@@ -7,6 +7,9 @@ const {
   updateResource,
   deleteResource,
   uploadCloudDocument,
+  requestDocumentOtp,
+  verifyDocumentOtp,
+  updateResourceAccess,
 } = require('../controllers/resourceController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
@@ -15,6 +18,12 @@ const upload = require('../middleware/uploadMiddleware');
 
 // Get all resources evaluated dynamically
 router.get('/', protect, getResources);
+
+// MFA Challenge for Document Access (sends OTP to user's registered email)
+router.post('/:id/request-otp', protect, requestDocumentOtp);
+
+// Verify MFA OTP for Document Access (verifies OTP and unlocks document)
+router.post('/:id/verify-otp', protect, verifyDocumentOtp);
 
 // Access a specific resource details (secured by Zero Trust Middleware)
 router.get('/:id', protect, zeroTrustCheck, getResourceById);
@@ -29,7 +38,8 @@ router.post('/upload', protect, authorizeRoles('admin'), (req, res, next) => {
   });
 }, uploadCloudDocument);
 
-// Admin-only CRUD operations
+// Admin-only Access Management & CRUD operations
+router.put('/:id/access', protect, authorizeRoles('admin'), updateResourceAccess);
 router.post('/', protect, authorizeRoles('admin'), createResource);
 router.put('/:id', protect, authorizeRoles('admin'), updateResource);
 router.delete('/:id', protect, authorizeRoles('admin'), deleteResource);

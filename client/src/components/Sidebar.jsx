@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import BrandLogo from './BrandLogo';
 import {
   LayoutDashboard,
   Shield,
@@ -54,7 +55,7 @@ const Sidebar = () => {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <Shield size={28} />
+        <BrandLogo size={32} glow={true} />
         <div>
           <span className="sidebar-logo-text">Cloud Shield</span>
           <span className="sidebar-logo-sub">Zero Trust Security</span>

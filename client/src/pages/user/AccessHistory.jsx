@@ -3,6 +3,7 @@ import { apiFetch } from '../../services/api';
 import DataTable from '../../components/DataTable';
 import StatusBadge from '../../components/StatusBadge';
 import RiskBadge from '../../components/RiskBadge';
+import BrandLogo from '../../components/BrandLogo';
 import { History, Shield, Globe, Terminal } from 'lucide-react';
 
 const AccessHistory = () => {
@@ -47,8 +48,11 @@ const AccessHistory = () => {
   return (
     <div className="content-body">
       <div className="page-header">
-        <h1 className="page-title">Personal Audit Trails</h1>
-        <p className="page-subtitle">Historical records of authentication, validation, and resource access events</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandLogo size={26} glow={true} />
+          <h1 className="page-title">Personal Audit Trails</h1>
+        </div>
+        <p className="page-subtitle">Track, monitor, and audit your personal resource authorizations</p>
       </div>
 
       <div className="glass-card">

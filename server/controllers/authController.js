@@ -1,6 +1,8 @@
 const User = require('../models/User');
+const DocumentOtp = require('../models/DocumentOtp');
 const generateToken = require('../utils/generateToken');
 const mfaService = require('../services/mfaService');
+const emailService = require('../services/emailService');
 const loggingService = require('../services/loggingService');
 const logger = require('../utils/logger');
 
@@ -180,9 +182,44 @@ const loginUser = async (req, res) => {
 
     // Check if user requires MFA
     if (user.security.mfaEnabled) {
+      const otp = mfaService.generateNumericOtp();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+      await DocumentOtp.deleteMany({ user: user._id, purpose: 'login_mfa', verified: false });
+
+      const docOtp = new DocumentOtp({
+        user: user._id,
+        email: user.email,
+        otp,
+        expiresAt,
+        purpose: 'login_mfa',
+      });
+      await docOtp.save();
+
+      await emailService.sendMfaSecurityOtp({
+        user,
+        otp,
+        title: 'Login Identity Verification',
+        description: 'A sign-in request was detected. Enter this verification code to complete login.',
+      });
+
+      const targetEmail =
+        (user.email.endsWith('@company.com') || user.email.endsWith('@example.com')) && process.env.EMAIL_USER
+          ? process.env.EMAIL_USER
+          : user.email;
+
+      const maskEmail = (email) => {
+        if (!email) return '';
+        const [local, domain] = email.split('@');
+        if (!domain) return email;
+        const maskedLocal = local.length > 2 ? `${local[0]}${'*'.repeat(local.length - 2)}${local[local.length - 1]}` : `${local[0]}*`;
+        return `${maskedLocal}@${domain}`;
+      };
+
       return res.status(200).json({
         mfaRequired: true,
-        email: user.email,
+        email: targetEmail,
+        maskedEmail: maskEmail(targetEmail),
         tempToken: generateToken(user._id),
       });
     }
@@ -210,23 +247,41 @@ const loginUser = async (req, res) => {
 };
 
 /**
- * Verify MFA Token
+ * Verify MFA Token (Email OTP for Login)
  */
 const verifyMfa = async (req, res) => {
   try {
     const { token } = req.body;
-    // user already set on req by protect middleware
-    const user = await User.findById(req.user._id).select('+security.mfaSecret');
+    const user = await User.findById(req.user._id);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Verify token
-    const isVerified = mfaService.verifyToken(user.security.mfaSecret, token);
-    if (!isVerified) {
-      return res.status(400).json({ message: 'Invalid multi-factor authentication code.' });
+    if (!token || typeof token !== 'string' || !token.trim()) {
+      return res.status(400).json({ message: 'Please enter the 6-digit OTP code sent to your email.' });
     }
+
+    const cleanOtp = token.trim();
+
+    const otpRecord = await DocumentOtp.findOne({
+      user: user._id,
+      purpose: 'login_mfa',
+      verified: false,
+      expiresAt: { $gt: new Date() },
+    }).sort({ createdAt: -1 });
+
+    const isVerified = otpRecord && otpRecord.otp === cleanOtp;
+    if (!isVerified) {
+      if (otpRecord) {
+        otpRecord.attempts += 1;
+        await otpRecord.save();
+      }
+      return res.status(400).json({ message: 'Invalid multi-factor authentication code. Please check your email.' });
+    }
+
+    otpRecord.verified = true;
+    await otpRecord.save();
 
     // Log MFA success
     const ip = req.headers['x-simulated-ip'] || req.ip || '192.168.1.10';
@@ -242,7 +297,7 @@ const verifyMfa = async (req, res) => {
       severity: 'Low',
       status: 'Success',
       riskScore: user.riskScore,
-      details: 'MFA challenge verification passed successfully',
+      details: 'MFA login challenge verification passed successfully',
     });
 
     res.status(200).json({
@@ -283,7 +338,7 @@ const getUserProfile = async (req, res) => {
 };
 
 /**
- * Enable MFA Setup (Generates QR Code URL & Secret)
+ * Enable MFA Setup (Dispatches OTP to registered email)
  */
 const setupMfa = async (req, res) => {
   try {
@@ -292,35 +347,84 @@ const setupMfa = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const { secret, qrCodeUrl } = mfaService.generateSecret(user.email);
-    user.security.mfaSecret = secret;
-    await user.save();
+    const otp = mfaService.generateNumericOtp();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await DocumentOtp.deleteMany({ user: user._id, purpose: 'mfa_setup', verified: false });
+
+    const docOtp = new DocumentOtp({
+      user: user._id,
+      email: user.email,
+      otp,
+      expiresAt,
+      purpose: 'mfa_setup',
+    });
+    await docOtp.save();
+
+    await emailService.sendMfaSecurityOtp({
+      user,
+      otp,
+      title: 'MFA Security Setup',
+      description: 'You initiated Multi-Factor Authentication enrollment for your account.',
+    });
+
+    const targetEmail =
+      (user.email.endsWith('@company.com') || user.email.endsWith('@example.com')) && process.env.EMAIL_USER
+        ? process.env.EMAIL_USER
+        : user.email;
+
+    const maskEmail = (email) => {
+      if (!email) return '';
+      const [local, domain] = email.split('@');
+      if (!domain) return email;
+      const maskedLocal = local.length > 2 ? `${local[0]}${'*'.repeat(local.length - 2)}${local[local.length - 1]}` : `${local[0]}*`;
+      return `${maskedLocal}@${domain}`;
+    };
 
     res.status(200).json({
-      secret,
-      qrCodeUrl,
+      success: true,
+      message: `MFA enrollment verification code sent to registered email (${maskEmail(targetEmail)})`,
+      email: targetEmail,
+      maskedEmail: maskEmail(targetEmail),
     });
   } catch (error) {
+    logger.error(`setupMfa error: ${error.message}`);
     res.status(500).json({ message: 'Failed to generate MFA setup details' });
   }
 };
 
 /**
- * Confirm and Enable MFA
+ * Confirm and Enable MFA with email OTP
  */
 const confirmMfa = async (req, res) => {
   try {
     const { token } = req.body;
-    const user = await User.findById(req.user._id).select('+security.mfaSecret');
+    const user = await User.findById(req.user._id);
 
-    if (!user || !user.security.mfaSecret) {
-      return res.status(400).json({ message: 'MFA setup not initialized.' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    const isVerified = mfaService.verifyToken(user.security.mfaSecret, token);
+    if (!token || typeof token !== 'string' || !token.trim()) {
+      return res.status(400).json({ message: 'Please enter the 6-digit OTP code sent to your email.' });
+    }
+
+    const cleanOtp = token.trim();
+
+    const otpRecord = await DocumentOtp.findOne({
+      user: user._id,
+      purpose: 'mfa_setup',
+      verified: false,
+      expiresAt: { $gt: new Date() },
+    }).sort({ createdAt: -1 });
+
+    const isVerified = otpRecord && otpRecord.otp === cleanOtp;
     if (!isVerified) {
-      return res.status(400).json({ message: 'Verification failed. Invalid code.' });
+      return res.status(400).json({ message: 'Verification failed. Invalid code from email.' });
     }
+
+    otpRecord.verified = true;
+    await otpRecord.save();
 
     user.security.mfaEnabled = true;
     await user.save();

@@ -1,15 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../services/api';
-import { KeyRound, ShieldAlert, CheckCircle, AlertCircle, Copy } from 'lucide-react';
+import BrandLogo from '../../components/BrandLogo';
+import { KeyRound, ShieldAlert, CheckCircle, AlertCircle, Mail, RefreshCw, ShieldCheck } from 'lucide-react';
 
 const Security = () => {
   const { user, refreshProfile } = useAuth();
-  const [setupData, setSetupData] = useState(null); // stores secret and qrCodeUrl
+  const [setupData, setSetupData] = useState(null); // stores email and maskedEmail
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
 
   const handleStartSetup = async () => {
     setError('');
@@ -19,6 +28,8 @@ const Security = () => {
     try {
       const data = await apiFetch('/auth/mfa/setup', { method: 'POST' });
       setSetupData(data);
+      setCooldown(45);
+      setSuccess(data.message || 'MFA verification code sent to your registered email.');
       setLoading(false);
     } catch (err) {
       setError(err.message || 'Failed to initialize MFA setup.');
@@ -36,23 +47,27 @@ const Security = () => {
       return;
     }
 
+    setLoading(true);
     try {
-      const data = await apiFetch('/auth/mfa/confirm', {
+      const data = await apiFetch('/auth/mfa/verify', {
         method: 'POST',
-        body: { token: code },
+        body: { code },
       });
 
-      setSuccess(data.message || 'MFA enabled successfully.');
+      setSuccess(data.message || 'Email MFA activated successfully on your account!');
       setSetupData(null);
       setCode('');
+      localStorage.setItem('sim_mfa_verified', 'true');
       refreshProfile(); // update user context
+      setLoading(false);
     } catch (err) {
-      setError(err.message || 'MFA confirmation failed. Verify the code.');
+      setError(err.message || 'Invalid or expired verification code. Please check your email.');
+      setLoading(false);
     }
   };
 
   const handleDisableMfa = async () => {
-    if (!window.confirm('Are you sure you want to disable Multi-Factor Authentication? This increases account risk score.')) {
+    if (!window.confirm('Are you sure you want to disable Email MFA? Your account security level will be downgraded.')) {
       return;
     }
     
@@ -80,7 +95,10 @@ const Security = () => {
   return (
     <div className="content-body">
       <div className="page-header">
-        <h1 className="page-title">Credential Security Settings</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandLogo size={26} glow={true} />
+          <h1 className="page-title">Credential Security Settings</h1>
+        </div>
         <p className="page-subtitle">Configure multi-factor tokens, passwords, and recovery backups</p>
       </div>
 
@@ -109,8 +127,8 @@ const Security = () => {
 
           {/* MFA Status Indicator */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: user.security?.mfaEnabled ? '#f0fdf4' : '#fff5f5', marginBottom: 24 }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: user.security?.mfaEnabled ? 'var(--success-bg)' : 'var(--danger-bg)', color: user.security?.mfaEnabled ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', justifyCenter: 'center', justifyContent: 'center' }}>
-              {user.security?.mfaEnabled ? <CheckCircle size={20} /> : <ShieldAlert size={20} />}
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: user.security?.mfaEnabled ? 'var(--success-bg)' : 'var(--danger-bg)', color: user.security?.mfaEnabled ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {user.security?.mfaEnabled ? <ShieldCheck size={20} /> : <ShieldAlert size={20} />}
             </div>
             <div>
               <span style={{ fontWeight: 700, fontSize: '0.95rem', display: 'block' }}>
@@ -118,8 +136,8 @@ const Security = () => {
               </span>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 {user.security?.mfaEnabled 
-                  ? 'Your account is secured with two-factor authorization challenge.' 
-                  : 'Your account is in high-risk state. Unrecognized locations will block logins.'}
+                  ? 'Your account is secured with email OTP multi-factor authentication on every login and sensitive resource access.' 
+                  : 'Your account is currently without MFA. Enroll below to secure your access.'}
               </span>
             </div>
           </div>
@@ -128,67 +146,66 @@ const Security = () => {
           {!user.security?.mfaEnabled && !setupData && (
             <div style={{ textAlign: 'center', padding: '20px 0' }}>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 20 }}>
-                Enrolling in MFA protects your profile from unauthorized device logins and locations.
+                Enrolling in Email MFA verifies your identity with a one-time passcode sent directly to your registered inbox.
               </p>
               <button onClick={handleStartSetup} className="btn btn-primary" disabled={loading}>
-                {loading ? 'Initializing Setup Wizard...' : 'Enroll in Multi-Factor Authentication'}
+                {loading ? 'Sending OTP to Email...' : 'Enroll in Multi-Factor Authentication'}
               </button>
             </div>
           )}
 
           {/* Setup Wizard Active */}
-          {setupData && (
-            <div>
-              <h3 style={{ fontSize: '1rem', marginBottom: 12 }}>MFA Authenticator Setup Wizard</h3>
-              
-              <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', marginBottom: 24 }}>
-                <img
-                  src={setupData.qrCodeUrl}
-                  alt="MFA QR Code Setup"
-                  style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: 8, backgroundColor: '#fff', width: '150px', height: '150px' }}
-                />
-                
-                <div style={{ fontSize: '0.85rem', lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <p>1. Scan the QR code using Google Authenticator, Microsoft Authenticator, or Duo Mobile.</p>
-                  <p>2. Alternatively, enter the manual setup key:</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <code style={{ fontSize: '1.05rem', padding: '6px 12px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', fontWeight: 700 }}>
-                      {setupData.secret}
-                    </code>
-                  </div>
-                </div>
+          {setupData && !user.security?.mfaEnabled && (
+            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <Mail size={20} style={{ color: 'var(--primary)' }} />
+                <h3 style={{ fontSize: '1rem', margin: 0, fontWeight: 700 }}>Email OTP Verification</h3>
               </div>
 
-              <form onSubmit={handleConfirmSetup} style={{ borderTop: '1px solid var(--border-color)', paddingTop: 20 }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+                A 6-digit verification code was sent to: <b>{setupData.maskedEmail || setupData.email}</b>. Enter it below to activate MFA.
+              </p>
+
+              <form onSubmit={handleConfirmSetup}>
                 <div className="form-group">
-                  <label className="form-label" htmlFor="otpCode">Confirm Setup Code</label>
-                  <div style={{ display: 'flex', gap: 12 }}>
+                  <label className="form-label" htmlFor="otpCode">Enter 6-Digit Email OTP</label>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                     <input
                       className="form-input"
-                      style={{ maxWidth: '180px', fontSize: '1.1rem', letterSpacing: '2px', textAlign: 'center', fontFamily: 'monospace' }}
+                      style={{ maxWidth: '180px', fontSize: '1.3rem', letterSpacing: '4px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 700 }}
                       type="text"
                       maxLength="6"
                       id="otpCode"
-                      placeholder="e.g. 123456"
+                      placeholder="• • • • • •"
                       value={code}
                       onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                       required
+                      autoFocus
                     />
-                    <button type="submit" className="btn btn-primary">Enable MFA Token</button>
+                    <button type="submit" className="btn btn-primary" disabled={loading || code.length !== 6}>
+                      {loading ? 'Activating...' : 'Verify & Enable MFA'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleStartSetup}
+                      disabled={loading || cooldown > 0}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                      <span>{cooldown > 0 ? `Resend (${cooldown}s)` : 'Resend Code'}</span>
+                    </button>
                   </div>
-                </div>
-                <div style={{ padding: '12px', border: '1px dashed #f59e0b', backgroundColor: '#fffbeb', borderRadius: '8px', fontSize: '0.725rem', color: '#92400e', lineHeight: 1.3, marginTop: 12 }}>
-                  <b>Hint:</b> Enter code <code>123456</code> to verify and register successfully.
                 </div>
               </form>
             </div>
           )}
 
-          {/* MFA Enabled: Option to disable for testing */}
+          {/* MFA Enabled: Option to disable */}
           {user.security?.mfaEnabled && (
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 20, textAlign: 'center' }}>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
-                Multi-Factor Authentication is currently securing your user login sessions.
+                Multi-Factor Authentication is actively protecting your account logins and secured assets.
               </p>
               <button
                 onClick={handleDisableMfa}

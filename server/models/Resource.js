@@ -52,6 +52,32 @@ const ResourceSchema = new Schema(
 
     accessPolicy: { type: Schema.Types.ObjectId, ref: 'Policy' },
 
+    // Admin Access Control & Permission Rules
+    allowedDepartments: {
+      type: [String],
+      default: ['All'],
+    },
+    allowedRoles: {
+      type: [String],
+      default: ['admin', 'employee', 'manager'],
+    },
+    allowedUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    blockedUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    mfaRequirement: {
+      type: String,
+      enum: ['Always Required', 'Risk-Based', 'Disabled'],
+      default: 'Always Required',
+    },
+    downloadAllowed: {
+      type: Boolean,
+      default: true,
+    },
+    accessStatus: {
+      type: String,
+      enum: ['Active', 'Restricted', 'Revoked'],
+      default: 'Active',
+    },
+
     description: String,
     cloudStorage: { type: CloudStorageSchema, default: () => ({ isCloudPdf: false }) },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },

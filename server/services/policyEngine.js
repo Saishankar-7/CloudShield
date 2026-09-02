@@ -23,7 +23,67 @@ const policyEngine = {
       };
     }
 
-    // 2. If no policy exists for this resource, fallback to Zero Trust resource status & sensitivity gating
+    // 2. Resource-Level Access Controls Configured by Administrator
+    if (resource) {
+      // Check if access has been revoked by admin
+      if (resource.accessStatus === 'Revoked') {
+        return {
+          decision: 'Deny',
+          reason: 'Administrator has revoked access to this resource.',
+          accessLevel: 'None',
+        };
+      }
+
+      // Check if user is explicitly blocked by admin
+      if (resource.blockedUsers && resource.blockedUsers.some((uid) => uid.toString() === user._id.toString())) {
+        return {
+          decision: 'Deny',
+          reason: 'User access has been specifically blocked by an Administrator.',
+          accessLevel: 'None',
+        };
+      }
+
+      // Check allowed roles configured by admin
+      if (resource.allowedRoles && resource.allowedRoles.length > 0 && !resource.allowedRoles.includes(user.role)) {
+        return {
+          decision: 'Deny',
+          reason: `Access restricted to roles: ${resource.allowedRoles.join(', ')}.`,
+          accessLevel: 'None',
+        };
+      }
+
+      // Check allowed departments configured by admin
+      const deptAllowed =
+        !resource.allowedDepartments ||
+        resource.allowedDepartments.length === 0 ||
+        resource.allowedDepartments.includes('All') ||
+        resource.allowedDepartments.includes(user.department);
+
+      if (!deptAllowed) {
+        return {
+          decision: 'Deny',
+          reason: `Access restricted to departments: ${resource.allowedDepartments.join(', ')}.`,
+          accessLevel: 'None',
+        };
+      }
+
+      // Check admin MFA policy rule
+      if (resource.mfaRequirement === 'Always Required') {
+        return {
+          decision: 'MFA_Required',
+          reason: 'Administrator Policy: Resource access requires email OTP MFA verification.',
+          accessLevel: 'Read Only',
+        };
+      } else if (resource.mfaRequirement === 'Disabled') {
+        return {
+          decision: 'Allow',
+          reason: 'Resource policy permits direct access without MFA.',
+          accessLevel: 'Read Only',
+        };
+      }
+    }
+
+    // 3. Fallback evaluation when no specific rule overrides
     if (!policy) {
       const isRestrictedOrProtected =
         resource &&
@@ -36,9 +96,9 @@ const policyEngine = {
 
       if (isRestrictedOrProtected) {
         return {
-          decision: 'Deny',
-          reason: 'Zero-Trust Gate: Protected Cloud Asset requires administrator access approval.',
-          accessLevel: 'None',
+          decision: 'MFA_Required',
+          reason: 'Zero-Trust Gate: Protected Cloud Asset requires email OTP MFA verification.',
+          accessLevel: 'Read Only',
         };
       }
       return {

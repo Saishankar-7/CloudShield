@@ -596,6 +596,118 @@ a {
   box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);
 }
 
+/* ==========================================================================
+   Modern Action Button Group & Table Action Controls
+   ========================================================================== */
+.action-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.775rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+}
+
+/* Primary Access Button (Indigo Gradient) */
+.action-btn-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+  color: #ffffff !important;
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+}
+
+.action-btn-primary:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #312e81 100%);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+  color: #ffffff !important;
+}
+
+/* Secondary / PDF View Button (Soft Slate/Sky) */
+.action-btn-secondary {
+  background: #f8fafc;
+  color: #334155 !important;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.action-btn-secondary:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Success Button (Emerald) */
+.action-btn-success {
+  background: #ecfdf5;
+  color: #059669 !important;
+  border-color: #a7f3d0;
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.1);
+}
+
+.action-btn-success:hover {
+  background: #059669;
+  color: #ffffff !important;
+  border-color: #059669;
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.25);
+}
+
+/* Danger / Delete Button (Rose) */
+.action-btn-danger {
+  background: #fff1f2;
+  color: #e11d48 !important;
+  border-color: #fecdd3;
+  box-shadow: 0 1px 3px rgba(225, 29, 72, 0.05);
+}
+
+.action-btn-danger:hover {
+  background: #e11d48;
+  color: #ffffff !important;
+  border-color: #e11d48;
+  box-shadow: 0 4px 10px rgba(225, 29, 72, 0.25);
+}
+
+/* Icon-only circular or square compact variant */
+.action-btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+}
+
+/* Responsive adjustment for small screens */
+@media (max-width: 768px) {
+  .action-btn span {
+    display: none;
+  }
+  .action-btn {
+    padding: 6px 8px;
+  }
+}
+
 /* Status Badges */
 .badge {
   display: inline-flex;

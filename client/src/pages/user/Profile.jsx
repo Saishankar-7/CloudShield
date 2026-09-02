@@ -1,4 +1,5 @@
 import { useAuth } from '../../context/AuthContext';
+import BrandLogo from '../../components/BrandLogo';
 import { User, Laptop, ShieldCheck, MapPin, Calendar, Smartphone } from 'lucide-react';
 
 const Profile = () => {
@@ -15,7 +16,10 @@ const Profile = () => {
   return (
     <div className="content-body">
       <div className="page-header">
-        <h1 className="page-title">Enterprise Identity Profile</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <BrandLogo size={26} glow={true} />
+          <h1 className="page-title">Enterprise Identity Profile</h1>
+        </div>
         <p className="page-subtitle">Zero Trust authentication token and directory settings</p>
       </div>
 

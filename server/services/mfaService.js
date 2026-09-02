@@ -5,6 +5,14 @@ const logger = require('../utils/logger');
  */
 const mfaService = {
   /**
+   * Generates a secure 6-digit numeric OTP.
+   */
+  generateNumericOtp: () => {
+    const crypto = require('crypto');
+    return String(crypto.randomInt(100000, 999999));
+  },
+
+  /**
    * Generates a mock secret and returns setup details.
    */
   generateSecret: (email) => {
