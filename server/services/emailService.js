@@ -16,30 +16,40 @@ const getTransporter = async () => {
   if (smtpHost && emailUser && emailPass) {
     transporter = nodemailer.createTransport({
       host: smtpHost,
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      port: parseInt(process.env.SMTP_PORT || '465', 10),
       secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
       auth: {
-        user: emailUser,
-        pass: emailPass,
+        user: emailUser.trim(),
+        pass: emailPass.trim().replace(/\s+/g, ''),
       },
-      connectionTimeout: 8000,
-      greetingTimeout: 8000,
-      socketTimeout: 10000,
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
+      tls: {
+        rejectUnauthorized: false,
+      },
     });
-    logger.info(`Nodemailer: Connected via Custom SMTP (${smtpHost}:${process.env.SMTP_PORT || 587}) for ${emailUser}`);
+    logger.info(`Nodemailer: Connected via Custom SMTP (${smtpHost}) for ${emailUser.trim()}`);
   } else if (emailUser && emailPass) {
-    // Gmail Transport using Nodemailer
+    // Gmail Direct SSL Transport (Port 465) - cloud container optimized (Render, AWS, Vercel)
+    const cleanUser = emailUser.trim();
+    const cleanPass = emailPass.trim().replace(/\s+/g, '');
     transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: {
-        user: emailUser,
-        pass: emailPass,
+        user: cleanUser,
+        pass: cleanPass,
       },
-      connectionTimeout: 8000,
-      greetingTimeout: 8000,
-      socketTimeout: 10000,
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
+      tls: {
+        rejectUnauthorized: false,
+      },
     });
-    logger.info(`Nodemailer: Connected via Gmail service for ${emailUser}`);
+    logger.info(`Nodemailer: Connected via Gmail Direct SSL (smtp.gmail.com:465) for ${cleanUser}`);
   } else {
     // Generate Nodemailer Ethereal SMTP test transporter
     logger.warn('Nodemailer: No EMAIL_USER/EMAIL_PASS in .env. Initializing Nodemailer Ethereal SMTP test transporter...');
