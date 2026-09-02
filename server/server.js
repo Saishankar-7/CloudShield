@@ -56,9 +56,13 @@ app.use('/api/users', userRoutes);
 app.use('/api/risk', riskRoutes);
 app.use('/api/reports', reportRoutes);
 
-// Base route
+// Base & Health Check routes (for Render liveness checks)
 app.get('/', (req, res) => {
   res.send('Zero Trust Cloud Security (CloudShield) API is running.');
+});
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'CloudShield API', timestamp: new Date().toISOString() });
 });
 
 // Central Error Handler Middleware
