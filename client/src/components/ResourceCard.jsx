@@ -129,12 +129,12 @@ const ResourceCard = ({ resource, onAccess, onRequestAccess }) => {
   };
 
   return (
-    <div className="glass-card resource-card">
+    <div className="resource-card">
       <div className="res-header">
-        <div className="res-icon" style={{ backgroundColor: isCloudPdf ? '#fee2e2' : undefined }}>
+        <div className={`res-icon ${isCloudPdf ? 'pdf-icon' : ''}`}>
           {getResourceIcon()}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+        <div className="res-badges">
           <RiskBadge level={sensitivity} />
           {getResourceStateBadge()}
         </div>
@@ -142,10 +142,8 @@ const ResourceCard = ({ resource, onAccess, onRequestAccess }) => {
 
       <div className="res-body">
         <h3 className="res-name">{name}</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-          <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-            {category} • {type}
-          </span>
+        <div className="res-meta">
+          <span>{category} • {type}</span>
           {isCloudPdf && (
             <span className="badge badge-info" style={{ fontSize: '0.675rem', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
               <Cloud size={10} />
@@ -155,17 +153,19 @@ const ResourceCard = ({ resource, onAccess, onRequestAccess }) => {
         </div>
         <p className="res-desc">{description}</p>
         {isCloudPdf && cloudStorage?.fileName && (
-          <div style={{ marginTop: 8, fontSize: '0.7rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <FileText size={12} style={{ color: '#ef4444' }} />
-            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>{cloudStorage.fileName}</span>
-            {cloudStorage.fileSize && <span>({cloudStorage.fileSize})</span>}
+          <div className="res-file-pill">
+            <FileText size={13} style={{ color: '#ef4444', flexShrink: 0 }} />
+            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
+              {cloudStorage.fileName}
+            </span>
+            {cloudStorage.fileSize && <span style={{ flexShrink: 0 }}>({cloudStorage.fileSize})</span>}
           </div>
         )}
       </div>
 
       <div className="res-footer">
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-          Owner: <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{resource.owner}</span>
+        <span className="res-owner" title={resource.owner}>
+          Owner: <span className="res-owner-name">{resource.owner}</span>
         </span>
         {renderActionButton()}
       </div>
