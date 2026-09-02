@@ -104,7 +104,7 @@ const UserSchema = new Schema(
     lastLoginIp: String,
     joinedOn: { type: Date, default: Date.now },
   },
-  { timestamps: true }
+  { timestamps: true, versionKey: false }
 );
 
 // --- Hooks ---

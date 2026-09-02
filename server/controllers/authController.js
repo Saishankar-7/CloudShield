@@ -129,40 +129,57 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
-    // Reset failed attempts on success
-    user.security.failedLoginAttempts = 0;
-    user.lastLogin = new Date();
-    user.lastLoginIp = deviceInfo.ip;
-
-    // Check device trust
-    const matchedDevice = user.trustedDevices.find(d => d.deviceId === deviceInfo.deviceId);
-    if (!matchedDevice) {
-      user.trustedDevices.push({
-        deviceId: deviceInfo.deviceId,
-        deviceName: deviceInfo.deviceName,
-        browser: deviceInfo.browser,
-        os: deviceInfo.os,
-        ip: deviceInfo.ip,
-        location: locationInfo.country,
-        isTrusted: false, // requires admin review or first time MFA to trust
-      });
-    } else {
-      matchedDevice.lastUsedAt = new Date();
-      matchedDevice.ip = deviceInfo.ip;
-    }
-
-    // Add session
+    // Session creation
     const sessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
-    user.activeSessions.push({
+    const newSession = {
       sessionId,
       device: deviceInfo.deviceName,
       browser: deviceInfo.browser,
       ip: deviceInfo.ip,
       location: `${locationInfo.city}, ${locationInfo.country}`,
       current: true,
-    });
+    };
 
-    await user.save();
+    // Atomic update to prevent VersionError race conditions during concurrent logins
+    const matchedDevice = user.trustedDevices?.find(d => d.deviceId === deviceInfo.deviceId);
+
+    const updateOps = {
+      $set: {
+        'security.failedLoginAttempts': 0,
+        lastLogin: new Date(),
+        lastLoginIp: deviceInfo.ip,
+      },
+      $push: {
+        activeSessions: {
+          $each: [newSession],
+          $slice: -10, // keep latest 10 sessions max
+        },
+      },
+    };
+
+    if (!matchedDevice) {
+      updateOps.$push.trustedDevices = {
+        deviceId: deviceInfo.deviceId,
+        deviceName: deviceInfo.deviceName,
+        browser: deviceInfo.browser,
+        os: deviceInfo.os,
+        ip: deviceInfo.ip,
+        location: locationInfo.country,
+        isTrusted: false,
+      };
+    } else {
+      await User.updateOne(
+        { _id: user._id, 'trustedDevices.deviceId': deviceInfo.deviceId },
+        {
+          $set: {
+            'trustedDevices.$.lastUsedAt': new Date(),
+            'trustedDevices.$.ip': deviceInfo.ip,
+          },
+        }
+      );
+    }
+
+    await User.findByIdAndUpdate(user._id, updateOps);
 
     // Log success
     await loggingService.logEvent({

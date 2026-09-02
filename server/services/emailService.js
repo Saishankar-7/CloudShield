@@ -22,6 +22,9 @@ const getTransporter = async () => {
         user: emailUser,
         pass: emailPass,
       },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
     });
     logger.info(`Nodemailer: Connected via Custom SMTP (${smtpHost}:${process.env.SMTP_PORT || 587}) for ${emailUser}`);
   } else if (emailUser && emailPass) {
@@ -32,6 +35,9 @@ const getTransporter = async () => {
         user: emailUser,
         pass: emailPass,
       },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
     });
     logger.info(`Nodemailer: Connected via Gmail service for ${emailUser}`);
   } else {
@@ -47,6 +53,9 @@ const getTransporter = async () => {
           user: testAccount.user,
           pass: testAccount.pass,
         },
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 6000,
       });
       logger.info(`Nodemailer: Ethereal test inbox created (${testAccount.user})`);
     } catch (etherealErr) {
