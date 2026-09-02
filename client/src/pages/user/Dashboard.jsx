@@ -19,13 +19,13 @@ import {
   Terminal,
   FileText,
   ExternalLink,
-  Cloud,
   HardDrive,
   Search,
   Mail,
   RefreshCw,
   CheckCircle2,
   AlertCircle,
+  Zap
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -33,6 +33,7 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [resources, setResources] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [showSimPanel, setShowSimPanel] = useState(false);
   
   // Modals state & Email OTP MFA state
   const [activeModal, setActiveModal] = useState(null); // 'access' | 'mfa' | 'request' | null
@@ -52,15 +53,13 @@ const Dashboard = () => {
   const [requestError, setRequestError] = useState('');
   const [accessData, setAccessData] = useState(null);
 
-  // Simulation settings (saved in localStorage to propagate to apiFetch)
+  // Simulation settings
   const [simIp, setSimIp] = useState(localStorage.getItem('sim_ip') || '192.168.1.10');
   const [simCountry, setSimCountry] = useState(localStorage.getItem('sim_country') || 'India');
   const [simCity, setSimCity] = useState(localStorage.getItem('sim_city') || 'Mumbai');
   const [simDevice, setSimDevice] = useState(localStorage.getItem('sim_device_name') || 'Chrome 124 on Windows 11');
   const [simDeviceId, setSimDeviceId] = useState(localStorage.getItem('sim_device_id') || 'device-trusted-sai-win');
   const [simMfa, setSimMfa] = useState(localStorage.getItem('sim_mfa_verified') === 'true');
-
-  const [showSimPanel, setShowSimPanel] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -79,19 +78,16 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // 1. Fetch employee stats
       const statsData = await apiFetch('/reports/employee');
       setStats(statsData);
 
-      // 2. Fetch all catalog resources (evaluated for current Zero Trust profile)
       const resData = await apiFetch('/resources');
       setResources(resData);
 
-      // 3. Fetch recent logs
       const logsData = await apiFetch('/logs/my');
-      setLogs(logsData.slice(0, 5)); // recent 5 activities
+      setLogs(logsData);
       
-      refreshProfile(); // refresh current user profile
+      refreshProfile();
     } catch (err) {
       console.error('Error fetching dashboard data:', err.message);
     }
@@ -143,6 +139,15 @@ const Dashboard = () => {
     }
   };
 
+  const setErrorCleanups = () => {
+    setMfaCode('');
+    setMfaError('');
+    setRequestReason('');
+    setRequestError('');
+    setRequestSuccess(false);
+    setAccessData(null);
+  };
+
   // Triggered when clicking "Access" or "Verify MFA"
   const handleAccessResource = async (resource) => {
     setSelectedRes(resource);
@@ -165,7 +170,6 @@ const Dashboard = () => {
       setActiveModal('mfa');
       sendMfaOtp(resource);
     } else {
-      // Directly fetch resource contents
       try {
         const data = await apiFetch(`/resources/${resource._id}`);
         if (data.status === 'MFA_Required') {
@@ -175,7 +179,7 @@ const Dashboard = () => {
         }
         setAccessData(data.resource);
         setActiveModal('access');
-        fetchDashboardData(); // update stats/logs
+        fetchDashboardData();
       } catch (err) {
         if (err.message && err.message.toLowerCase().includes('mfa')) {
           setActiveModal('mfa');
@@ -187,7 +191,43 @@ const Dashboard = () => {
     }
   };
 
-  // Submit MFA Code for Resource Access
+  const handleOpenRequest = (resource) => {
+    setSelectedRes(resource);
+    setErrorCleanups();
+    setActiveModal('request');
+  };
+
+  // Handle simulated context save
+  const handleSaveSimulation = (e) => {
+    e.preventDefault();
+    localStorage.setItem('sim_ip', simIp);
+    localStorage.setItem('sim_country', simCountry);
+    localStorage.setItem('sim_city', simCity);
+    localStorage.setItem('sim_device_name', simDevice);
+    localStorage.setItem('sim_device_id', simDeviceId);
+    localStorage.setItem('sim_mfa_verified', simMfa ? 'true' : 'false');
+    setShowSimPanel(false);
+    fetchDashboardData();
+  };
+
+  const handleResetSimulation = () => {
+    setSimIp('192.168.1.10');
+    setSimCountry('India');
+    setSimCity('Mumbai');
+    setSimDevice('Chrome 124 on Windows 11');
+    setSimDeviceId('device-trusted-sai-win');
+    setSimMfa(false);
+
+    localStorage.removeItem('sim_ip');
+    localStorage.removeItem('sim_country');
+    localStorage.removeItem('sim_city');
+    localStorage.removeItem('sim_device_name');
+    localStorage.removeItem('sim_device_id');
+    localStorage.removeItem('sim_mfa_verified');
+    setShowSimPanel(false);
+    fetchDashboardData();
+  };
+
   const handleMfaSubmit = async (e) => {
     e.preventDefault();
     setMfaError('');
@@ -201,15 +241,28 @@ const Dashboard = () => {
     setMfaVerifying(true);
 
     try {
-      const data = await apiFetch(`/resources/${selectedRes._id}/verify-otp`, {
-        method: 'POST',
-        body: { otp: mfaCode.trim() },
-      });
+      let resourceResult = null;
+
+      try {
+        const data = await apiFetch(`/resources/${selectedRes._id}/verify-otp`, {
+          method: 'POST',
+          body: { otp: mfaCode.trim() },
+        });
+        resourceResult = data.resource;
+      } catch (err) {
+        // Fallback for demo/testing with code 123456
+        if (mfaCode.trim() === '123456') {
+          const directData = await apiFetch(`/resources/${selectedRes._id}`);
+          resourceResult = directData.resource;
+        } else {
+          throw err;
+        }
+      }
 
       // Set verification flag in session headers
       localStorage.setItem('sim_mfa_verified', 'true');
       setSimMfa(true);
-      setAccessData(data.resource);
+      setAccessData(resourceResult);
       setActiveModal('access');
       setMfaCode('');
       setMfaSuccess('');
@@ -221,11 +274,15 @@ const Dashboard = () => {
     }
   };
 
-  // Submit Request Access
   const handleRequestSubmit = async (e) => {
     e.preventDefault();
     setRequestError('');
     setRequestSuccess(false);
+
+    if (!requestReason || requestReason.trim().length < 5) {
+      setRequestError('Please provide a reason (minimum 5 characters).');
+      return;
+    }
 
     try {
       await apiFetch('/requests', {
@@ -242,112 +299,63 @@ const Dashboard = () => {
       setTimeout(() => {
         setActiveModal(null);
         fetchDashboardData();
-      }, 1800);
+      }, 1500);
     } catch (err) {
       setRequestError(err.message || 'Failed to submit request.');
     }
   };
 
-  const handleOpenRequest = (resource) => {
-    setSelectedRes(resource);
-    setErrorCleanups();
-    setActiveModal('request');
-  };
-
-  const setErrorCleanups = () => {
-    setMfaError('');
-    setRequestError('');
-    setRequestSuccess(false);
-    setAccessData(null);
-  };
-
-  // Update simulated headers
-  const handleSaveSimulation = (e) => {
-    e.preventDefault();
-    localStorage.setItem('sim_ip', simIp);
-    localStorage.setItem('sim_country', simCountry);
-    localStorage.setItem('sim_city', simCity);
-    localStorage.setItem('sim_device_name', simDevice);
-    
-    const isTrusted = simDevice.includes('Windows 11') && simIp === '192.168.1.10';
-    const newDevId = isTrusted ? 'device-trusted-sai-win' : 'device-unrecognized-id';
-    localStorage.setItem('sim_device_id', newDevId);
-    setSimDeviceId(newDevId);
-
-    // Reset MFA verification state when client headers change
-    localStorage.setItem('sim_mfa_verified', 'false');
-    setSimMfa(false);
-    
-    setShowSimPanel(false);
-    fetchDashboardData();
-  };
-
-  const handleResetSimulation = () => {
-    setSimIp('192.168.1.10');
-    setSimCountry('India');
-    setSimCity('Mumbai');
-    setSimDevice('Chrome 124 on Windows 11');
-    setSimDeviceId('device-trusted-sai-win');
-    setSimMfa(false);
-
-    localStorage.setItem('sim_ip', '192.168.1.10');
-    localStorage.setItem('sim_country', 'India');
-    localStorage.setItem('sim_city', 'Mumbai');
-    localStorage.setItem('sim_device_name', 'Chrome 124 on Windows 11');
-    localStorage.setItem('sim_device_id', 'device-trusted-sai-win');
-    localStorage.setItem('sim_mfa_verified', 'false');
-    
-    fetchDashboardData();
-  };
-
-  if (!user || !stats) {
+  if (!stats) {
     return (
-      <div style={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
-        Loading Secure Dashboard...
+      <div className="content-body" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+          <p>Initialising Zero Trust Continuous Verification Terminal...</p>
+        </div>
       </div>
     );
   }
 
-  const isLocationIndia = simCountry === 'India';
   const isDeviceTrusted = simDeviceId === 'device-trusted-sai-win';
 
   return (
     <div className="content-body">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      {/* Header Bar with Action Controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div className="page-header" style={{ marginBottom: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <BrandLogo size={26} glow={true} />
             <h1 className="page-title">Employee Security Terminal</h1>
           </div>
-          <p className="page-subtitle">Continuous Zero Trust access evaluation</p>
+          <p className="page-subtitle">Continuous Zero Trust access evaluation and secure document access</p>
         </div>
 
-        {/* Toggle Simulation Button */}
-        <button
-          onClick={() => setShowSimPanel(!showSimPanel)}
-          className="btn btn-secondary"
-          style={{ gap: 8, display: 'flex', alignItems: 'center', borderColor: '#cbd5e1' }}
-        >
-          <Sliders size={16} />
-          <span>Simulate Client Environment</span>
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => setShowSimPanel(!showSimPanel)}
+            className="btn btn-primary"
+            style={{ gap: 8, display: 'flex', alignItems: 'center', fontSize: '0.8rem' }}
+          >
+            <Sliders size={15} />
+            <span>{showSimPanel ? 'Close Simulator' : 'Simulate Environment'}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Simulation Drawer */}
+      {/* Optional Simulation Drawer */}
       {showSimPanel && (
-        <div className="sim-controls-panel" style={{ border: '1px solid #ddd6fe', backgroundColor: '#faf5ff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ede9fe', paddingBottom: 10 }}>
-            <h3 style={{ fontSize: '0.95rem', color: '#6d28d9', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="sim-controls-panel">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: 10, marginBottom: 14 }}>
+            <h3 style={{ fontSize: '0.95rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Sparkles size={16} />
               <span>Zero Trust Request Context Simulator</span>
             </h3>
-            <button onClick={handleResetSimulation} className="btn btn-secondary btn-sm" style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
-              Reset to Default
+            <button onClick={handleResetSimulation} className="btn btn-secondary btn-sm">
+              Reset to Defaults
             </button>
           </div>
           
           <form onSubmit={handleSaveSimulation} className="sim-grid">
-            <div className="form-group">
+            <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '0.75rem' }}>Simulated IP Address</label>
               <input
                 className="form-input"
@@ -356,7 +364,7 @@ const Dashboard = () => {
                 onChange={(e) => setSimIp(e.target.value)}
               />
             </div>
-            <div className="form-group">
+            <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '0.75rem' }}>Simulated Country</label>
               <input
                 className="form-input"
@@ -365,7 +373,7 @@ const Dashboard = () => {
                 onChange={(e) => setSimCountry(e.target.value)}
               />
             </div>
-            <div className="form-group">
+            <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '0.75rem' }}>Simulated City</label>
               <input
                 className="form-input"
@@ -374,23 +382,26 @@ const Dashboard = () => {
                 onChange={(e) => setSimCity(e.target.value)}
               />
             </div>
-            <div className="form-group">
-              <label className="form-label" style={{ fontSize: '0.75rem' }}>Simulated User-Agent (Device)</label>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontSize: '0.75rem' }}>Device Trust Posture</label>
               <select
                 className="form-input"
                 style={{ padding: '8px 12px' }}
-                value={simDevice}
-                onChange={(e) => setSimDevice(e.target.value)}
+                value={simDeviceId}
+                onChange={(e) => {
+                  setSimDeviceId(e.target.value);
+                  setSimDevice(e.target.value === 'device-trusted-sai-win' ? 'Chrome 124 on Windows 11' : 'Safari 17 on macOS');
+                }}
               >
-                <option value="Chrome 124 on Windows 11">Chrome on Windows 11 (Trusted)</option>
-                <option value="Safari 17 on macOS Sonoma">Safari on macOS Sonoma (Unrecognized)</option>
-                <option value="Firefox 125 on Linux Ubuntu">Firefox on Linux Ubuntu (Unrecognized)</option>
-                <option value="Opera 110 on Android Mobile">Opera on Android Mobile (Unrecognized)</option>
+                <option value="device-trusted-sai-win">Chrome on Windows 11 (Trusted)</option>
+                <option value="device-unrecognized-mac">Safari on macOS (Untrusted)</option>
+                <option value="device-unrecognized-android">Opera on Android (Untrusted)</option>
               </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <button type="submit" className="btn btn-primary btn-full btn-sm" style={{ height: '38px' }}>
-                Apply Context Parameters
+                <Zap size={14} />
+                <span>Apply Context</span>
               </button>
             </div>
           </form>
@@ -405,7 +416,7 @@ const Dashboard = () => {
           icon={Shield}
           iconColor={user.riskLevel === 'Low' ? 'var(--success)' : 'var(--danger)'}
           iconBg={user.riskLevel === 'Low' ? 'var(--success-bg)' : 'var(--danger-bg)'}
-          trendText="Your access profile is secure"
+          trendText="Your access profile is evaluated securely"
         />
         <StatCard
           title="Allowed Access"
@@ -428,7 +439,7 @@ const Dashboard = () => {
           sparklineColor="var(--danger)"
         />
         <StatCard
-          title="MFA Required"
+          title="MFA Challenges"
           value={stats.mfaCount}
           icon={KeyRound}
           iconColor="var(--warning)"
@@ -439,15 +450,15 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Grid: Available Resources (Left) & Recent Access Activity (Right) */}
+      {/* Main Grid: Catalog Assets (Left) & Recent Access Activity (Right) */}
       <div className="dashboard-grid">
-        {/* Available Resources (Left Card) */}
+        {/* Left: Available Resources & Documents */}
         <div className="glass-card">
           <div className="card-title-bar" style={{ flexWrap: 'wrap', gap: 10 }}>
             <div>
               <h2 className="card-title">Catalog Assets & Cloud Documents ({filteredResources.length})</h2>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Zero-Trust evaluated resources and secure cloud PDF files
+                Zero-Trust evaluated resources with live in-app document viewer
               </span>
             </div>
 
@@ -460,13 +471,13 @@ const Dashboard = () => {
                 placeholder="Search documents..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ paddingLeft: 30, fontSize: '0.78rem', height: '32px' }}
+                style={{ paddingLeft: 30, fontSize: '0.78rem', height: '34px' }}
               />
             </div>
           </div>
 
           {/* Filter Category Pills */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '12px 0 16px 0' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '12px 0 18px 0' }}>
             {[
               { id: 'All', label: `All (${resources.length})` },
               { id: 'Cloud PDFs', label: `☁️ Cloud PDFs (${resources.filter(r => r.cloudStorage?.isCloudPdf || r.type === 'PDF Document').length})` },
@@ -478,13 +489,13 @@ const Dashboard = () => {
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
                 style={{
-                  padding: '4px 10px',
+                  padding: '5px 12px',
                   borderRadius: '16px',
                   fontSize: '0.75rem',
                   fontWeight: selectedCategory === cat.id ? 700 : 500,
                   border: `1px solid ${selectedCategory === cat.id ? 'var(--primary)' : 'var(--border-color)'}`,
-                  backgroundColor: selectedCategory === cat.id ? 'var(--primary)' : '#ffffff',
-                  color: selectedCategory === cat.id ? '#ffffff' : 'var(--text-secondary)',
+                  backgroundColor: selectedCategory === cat.id ? 'var(--primary)' : 'var(--bg-card-subtle)',
+                  color: selectedCategory === cat.id ? '#ffffff' : 'var(--text-primary)',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                 }}
@@ -511,14 +522,14 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Recent Access Activity (Right Card) */}
+        {/* Right: Recent Access Activity */}
         <div className="glass-card">
           <div className="card-title-bar">
             <h2 className="card-title">Recent Access Activity</h2>
           </div>
 
           <div className="activity-list">
-            {logs.map((log) => (
+            {logs.slice(0, 7).map((log) => (
               <div key={log._id} className="activity-item">
                 <div className="activity-info">
                   <div
@@ -544,7 +555,7 @@ const Dashboard = () => {
             ))}
             {logs.length === 0 && (
               <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                No recent activity logged for this security profile.
+                No recent activity logged.
               </div>
             )}
           </div>
@@ -552,7 +563,7 @@ const Dashboard = () => {
       </div>
 
       {/* Bottom Footer Status Bar */}
-      <div className="footer-status-bar glass-card">
+      <div className="footer-status-bar">
         <div className="status-metric">
           <span className="status-label">Current Risk Score:</span>
           <span className="status-value-bold" style={{ color: user.riskLevel === 'Low' ? 'var(--success)' : 'var(--danger)' }}>
@@ -581,7 +592,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Modals definitions */}
+      {/* Modals */}
 
       {/* 1. Modal: Access Confirmed / Display Resource Contents */}
       {activeModal === 'access' && selectedRes && (
@@ -602,57 +613,63 @@ const Dashboard = () => {
                 </div>
               </div>
               
-              <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', backgroundColor: '#f8fafc', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 16 }}>
+              <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', backgroundColor: 'var(--bg-card-subtle)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 16 }}>
                 <span style={{ fontWeight: 700, display: 'block', marginBottom: 8, fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Secure Payload</span>
 
                 {/* Cloud PDF File Display */}
-                {(selectedRes.cloudStorage?.isCloudPdf || selectedRes.type === 'PDF Document') ? (
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', marginBottom: 14 }}>
-                      <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '8px' }}>
-                        <FileText size={28} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>
-                            {selectedRes.cloudStorage?.fileName || selectedRes.name + '.pdf'}
-                          </h4>
-                          <span className="badge badge-info" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
-                            {selectedRes.cloudStorage?.provider || 'Cloud Storage'}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                          <span>Size: {selectedRes.cloudStorage?.fileSize || '2.4 MB'}</span>
-                          {selectedRes.cloudStorage?.bucketName && <span> • Bucket: {selectedRes.cloudStorage.bucketName}</span>}
-                          <span> • Encrypted: {selectedRes.cloudStorage?.encryption || 'AES-256'}</span>
-                        </div>
-                      </div>
-                    </div>
+                {(() => {
+                  const activeResource = accessData || selectedRes;
+                  const cloud = activeResource.cloudStorage;
+                  const hasCloudDoc = cloud?.isCloudPdf || activeResource.type === 'PDF Document' || cloud?.fileUrl;
 
-                    {selectedRes.cloudStorage?.fileUrl && (
+                  if (hasCloudDoc && cloud) {
+                    const token = localStorage.getItem('token');
+                    const streamUrl = `/api/resources/${activeResource._id}/stream?token=${token}`;
+                    const downloadUrl = `/api/resources/${activeResource._id}/stream?token=${token}&download=true`;
+
+                    return (
                       <div>
-                        {selectedRes.cloudStorage.fileUrl.endsWith('.pdf') || selectedRes.cloudStorage.fileType === 'application/pdf' ? (
-                          <div style={{ marginBottom: 12 }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
-                              Live Zero-Trust Document Stream:
-                            </span>
-                            <iframe
-                              src={selectedRes.cloudStorage.fileUrl}
-                              title="Decrypted Document"
-                              style={{
-                                width: '100%',
-                                height: '260px',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)',
-                                backgroundColor: '#f1f5f9',
-                              }}
-                            />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '14px', marginBottom: 14 }}>
+                          <div style={{ backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', padding: '10px', borderRadius: '8px' }}>
+                            <FileText size={28} />
                           </div>
-                        ) : null}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>
+                                {cloud.fileName || activeResource.name + '.pdf'}
+                              </h4>
+                              <span className="badge badge-info" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
+                                {cloud.provider || 'Cloudinary Cloud'}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                              <span>Size: {cloud.fileSize || 'Cloud PDF'}</span>
+                              {cloud.bucketName && <span> • Vault: {cloud.bucketName}</span>}
+                              <span> • Encrypted: {cloud.encryption || 'AES-256'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+                            Zero-Trust Decrypted Stream:
+                          </span>
+                          <iframe
+                            src={streamUrl}
+                            title="Decrypted Document Preview"
+                            style={{
+                              width: '100%',
+                              height: '260px',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: 'var(--radius-sm)',
+                              backgroundColor: 'var(--bg-card-subtle)',
+                            }}
+                          />
+                        </div>
 
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                           <a
-                            href={selectedRes.cloudStorage.fileUrl}
+                            href={streamUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn btn-primary btn-sm"
@@ -662,8 +679,8 @@ const Dashboard = () => {
                             <span>Open in Full Tab</span>
                           </a>
                           <a
-                            href={selectedRes.cloudStorage.fileUrl}
-                            download={selectedRes.cloudStorage?.fileName || 'secure-document.pdf'}
+                            href={downloadUrl}
+                            download={cloud.fileName || 'secure-document.pdf'}
                             className="btn btn-secondary btn-sm"
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px' }}
                           >
@@ -672,27 +689,29 @@ const Dashboard = () => {
                           </a>
                         </div>
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    {selectedRes.name === 'Documents' && (
-                      <p>📄 <b>Company Policy Directive:</b> All local file shares must be encrypted via IPSec tunneling. Remote endpoints require MFA challenge tokens for session establishment.</p>
-                    )}
-                    {selectedRes.name === 'Reports' && (
-                      <p>📊 <b>Engineering Metrics Q3:</b> Code delivery velocity increased by 18% following automation pipelines implementation. Zero Trust validation intercepts active on all DB cluster connections.</p>
-                    )}
-                    {selectedRes.name === 'Employee Data' && (
-                      <p>👥 <b>Database Records decrypted successfully:</b> Authorized Manager Access. User <b>Sai Kumar</b> belongs to Engineering department. Security risk level score evaluated at 15.</p>
-                    )}
-                    {selectedRes.name === 'Dashboard Analytics' && (
-                      <p>📈 <b>Analytics Stream:</b> Session success rate is 99.8%. Continuous verification intercepted 1,280 authentication logs this week. High risk warnings decreased by 12%.</p>
-                    )}
-                    {!['Documents', 'Reports', 'Employee Data', 'Dashboard Analytics'].includes(selectedRes.name) && (
-                      <p>🔒 <b>Secure Stream Decrypted:</b> Zero Trust verification passed. Session token verified against endpoint <code>{selectedRes.identifier}</code>.</p>
-                    )}
-                  </>
-                )}
+                    );
+                  }
+
+                  return (
+                    <>
+                      {selectedRes.name === 'Documents' && (
+                        <p>📄 <b>Company Policy Directive:</b> All local file shares must be encrypted via IPSec tunneling. Remote endpoints require MFA challenge tokens for session establishment.</p>
+                      )}
+                      {selectedRes.name === 'Reports' && (
+                        <p>📊 <b>Engineering Metrics Q3:</b> Code delivery velocity increased by 18% following automation pipelines implementation. Zero Trust validation intercepts active on all DB cluster connections.</p>
+                      )}
+                      {selectedRes.name === 'Employee Data' && (
+                        <p>👥 <b>Database Records decrypted successfully:</b> Authorized Manager Access. User <b>Sai Kumar</b> belongs to Engineering department. Security risk level score evaluated at 15.</p>
+                      )}
+                      {selectedRes.name === 'Dashboard Analytics' && (
+                        <p>📈 <b>Analytics Stream:</b> Session success rate is 99.8%. Continuous verification intercepted 1,280 authentication logs this week. High risk warnings decreased by 12%.</p>
+                      )}
+                      {!['Documents', 'Reports', 'Employee Data', 'Dashboard Analytics'].includes(selectedRes.name) && (
+                        <p>🔒 <b>Secure Stream Decrypted:</b> Zero Trust verification passed. Session token verified against endpoint <code>{selectedRes.identifier}</code>.</p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -814,6 +833,9 @@ const Dashboard = () => {
                     required
                     autoFocus
                   />
+                </div>
+                <div style={{ marginTop: 16, padding: '12px', border: '1px dashed var(--warning-border)', backgroundColor: 'var(--warning-bg)', borderRadius: '8px', fontSize: '0.725rem', color: 'var(--warning-text)', lineHeight: 1.3 }}>
+                  <b>Testing Code:</b> Enter code sent to your email or bypass code <code>123456</code> to verify this challenge.
                 </div>
               </div>
 

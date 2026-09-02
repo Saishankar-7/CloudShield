@@ -328,14 +328,14 @@ const MyResources = () => {
                 </div>
               </div>
               
-              <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', backgroundColor: '#f8fafc', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 16 }}>
+              <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', backgroundColor: 'var(--bg-card-subtle)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 16 }}>
                 <span style={{ fontWeight: 700, display: 'block', marginBottom: 8, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Secure Payload Contents</span>
 
                 {/* Cloud PDF File Display */}
                 {(selectedRes.cloudStorage?.isCloudPdf || selectedRes.type === 'PDF Document') ? (
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', marginBottom: 14 }}>
-                      <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '10px', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '14px', marginBottom: 14 }}>
+                      <div style={{ backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', padding: '10px', borderRadius: '8px' }}>
                         <FileText size={28} />
                       </div>
                       <div style={{ flex: 1 }}>
@@ -355,50 +355,54 @@ const MyResources = () => {
                       </div>
                     </div>
 
-                    {selectedRes.cloudStorage?.fileUrl && (
-                      <div>
-                        {selectedRes.cloudStorage.fileUrl.endsWith('.pdf') || selectedRes.cloudStorage.fileType === 'application/pdf' ? (
+                    {(() => {
+                      const token = localStorage.getItem('token');
+                      const streamUrl = `/api/resources/${selectedRes._id}/stream?token=${token}`;
+                      const downloadUrl = `/api/resources/${selectedRes._id}/stream?token=${token}&download=true`;
+
+                      return (
+                        <div>
                           <div style={{ marginBottom: 12 }}>
                             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
                               Live Zero-Trust Document Stream:
                             </span>
                             <iframe
-                              src={selectedRes.cloudStorage.fileUrl}
+                              src={streamUrl}
                               title="Decrypted Document"
                               style={{
                                 width: '100%',
                                 height: '260px',
                                 border: '1px solid var(--border-color)',
                                 borderRadius: 'var(--radius-sm)',
-                                backgroundColor: '#f1f5f9',
+                                backgroundColor: 'var(--bg-card-subtle)',
                               }}
                             />
                           </div>
-                        ) : null}
 
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                          <a
-                            href={selectedRes.cloudStorage.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-primary btn-sm"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px' }}
-                          >
-                            <ExternalLink size={14} />
-                            <span>Open in Full Tab</span>
-                          </a>
-                          <a
-                            href={selectedRes.cloudStorage.fileUrl}
-                            download={selectedRes.cloudStorage?.fileName || 'secure-document.pdf'}
-                            className="btn btn-secondary btn-sm"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px' }}
-                          >
-                            <HardDrive size={14} />
-                            <span>Download to Laptop</span>
-                          </a>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            <a
+                              href={streamUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-primary btn-sm"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', textDecoration: 'none' }}
+                            >
+                              <ExternalLink size={14} />
+                              <span>Open in Full Tab</span>
+                            </a>
+                            <a
+                              href={downloadUrl}
+                              download={selectedRes.cloudStorage?.fileName || 'secure-document.pdf'}
+                              className="btn btn-secondary btn-sm"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', textDecoration: 'none' }}
+                            >
+                              <HardDrive size={14} />
+                              <span>Download to Laptop</span>
+                            </a>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 ) : (
                   <>

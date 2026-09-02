@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
@@ -41,41 +42,43 @@ const DashboardLayout = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          {/* Public Auth Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/mfa" element={<MFA />} />
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            {/* Public Auth Routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/mfa" element={<MFA />} />
 
-          {/* Secure Employee Routes */}
-          <Route element={<ProtectedRoute allowedRoles={['employee', 'manager', 'admin']} />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/resources" element={<MyResources />} />
-              <Route path="/requests" element={<MyRequests />} />
-              <Route path="/history" element={<AccessHistory />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/security" element={<Security />} />
+            {/* Secure Employee Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['employee', 'manager', 'admin']} />}>
+              <Route element={<DashboardLayout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/resources" element={<MyResources />} />
+                <Route path="/requests" element={<MyRequests />} />
+                <Route path="/history" element={<AccessHistory />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/security" element={<Security />} />
+              </Route>
             </Route>
-          </Route>
 
-          {/* Secure Admin-Only Routes */}
-          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/users" element={<UserManagement />} />
-              <Route path="/admin/resources" element={<Resources />} />
-              <Route path="/admin/requests" element={<AccessRequests />} />
-              <Route path="/admin/logs" element={<SecurityLogs />} />
-              <Route path="/admin/risk" element={<RiskMonitor />} />
-              <Route path="/admin/reports" element={<ReportsAnalytics />} />
+            {/* Secure Admin-Only Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+              <Route element={<DashboardLayout />}>
+                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin/users" element={<UserManagement />} />
+                <Route path="/admin/resources" element={<Resources />} />
+                <Route path="/admin/requests" element={<AccessRequests />} />
+                <Route path="/admin/logs" element={<SecurityLogs />} />
+                <Route path="/admin/risk" element={<RiskMonitor />} />
+                <Route path="/admin/reports" element={<ReportsAnalytics />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
-      </Router>
-    </AuthProvider>
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

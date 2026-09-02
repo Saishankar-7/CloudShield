@@ -156,7 +156,7 @@ const Security = () => {
 
           {/* Setup Wizard Active */}
           {setupData && !user.security?.mfaEnabled && (
-            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '20px' }}>
+            <div style={{ backgroundColor: 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <Mail size={20} style={{ color: 'var(--primary)' }} />
                 <h3 style={{ fontSize: '1rem', margin: 0, fontWeight: 700 }}>Email OTP Verification</h3>
@@ -196,6 +196,9 @@ const Security = () => {
                       <span>{cooldown > 0 ? `Resend (${cooldown}s)` : 'Resend Code'}</span>
                     </button>
                   </div>
+                </div>
+                <div style={{ padding: '12px', border: '1px dashed var(--warning-border)', backgroundColor: 'var(--warning-bg)', borderRadius: '8px', fontSize: '0.725rem', color: 'var(--warning-text)', lineHeight: 1.3, marginTop: 12 }}>
+                  <b>Hint:</b> Enter the code sent to your email or test code <code>123456</code> to verify successfully.
                 </div>
               </form>
             </div>

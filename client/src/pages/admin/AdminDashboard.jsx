@@ -110,7 +110,7 @@ const AdminDashboard = () => {
               cy="60"
               r={radius}
               fill="none"
-              stroke="#e2e8f0"
+              stroke="var(--border-input)"
               strokeWidth={strokeWidth}
             />
             {/* Foreground Fill Circle */}
@@ -148,16 +148,23 @@ const AdminDashboard = () => {
 
   return (
     <div className="content-body">
-      <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <BrandLogo size={26} glow={true} />
-          <h1 className="page-title">IT Security Operations Dashboard</h1>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <BrandLogo size={26} glow={true} />
+            <h1 className="page-title" style={{ fontSize: '1.6rem', fontWeight: 700, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span>IT Security Operations Dashboard</span>
+              <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>SOC ACTIVE</span>
+            </h1>
+          </div>
+          <p className="page-subtitle" style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: 3 }}>
+            Real-time Zero Trust gateway overview and continuous telemetry monitoring
+          </p>
         </div>
-        <p className="page-subtitle">Real-time Zero Trust gateway overview and activity monitoring</p>
       </div>
 
       {/* Row of Stats Cards */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
         <StatCard
           title="Total Users"
           value={stats.cards.totalUsers.value}
@@ -237,7 +244,7 @@ const AdminDashboard = () => {
             {/* Draw a multi-segment look with Low risk primary */}
             <div className="donut-svg-wrapper">
               <svg width="120" height="120" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="60" cy="60" r="50" fill="none" stroke="#e2e8f0" strokeWidth="12" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border-input)" strokeWidth="12" />
                 <circle
                   cx="60"
                   cy="60"
