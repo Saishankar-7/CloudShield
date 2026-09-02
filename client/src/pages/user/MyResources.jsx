@@ -279,7 +279,7 @@ const MyResources = () => {
                 fontSize: '0.75rem',
                 fontWeight: selectedCategory === cat.id ? 700 : 500,
                 border: `1px solid ${selectedCategory === cat.id ? 'var(--primary)' : 'var(--border-color)'}`,
-                backgroundColor: selectedCategory === cat.id ? 'var(--primary)' : '#ffffff',
+                backgroundColor: selectedCategory === cat.id ? 'var(--primary)' : 'var(--bg-card-subtle)',
                 color: selectedCategory === cat.id ? '#ffffff' : 'var(--text-secondary)',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
@@ -312,7 +312,7 @@ const MyResources = () => {
       {/* 1. Modal: Access Confirmed */}
       {activeModal === 'access' && selectedRes && (
         <div className="modal-overlay" onClick={() => setActiveModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content unlock-pulse-success" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 style={{ fontSize: '1.1rem', color: 'var(--success-text)' }}>✓ Access Granted</h2>
               <button className="navbar-btn" onClick={() => setActiveModal(null)}>✕</button>

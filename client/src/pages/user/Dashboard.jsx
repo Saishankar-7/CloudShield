@@ -597,7 +597,7 @@ const Dashboard = () => {
       {/* 1. Modal: Access Confirmed / Display Resource Contents */}
       {activeModal === 'access' && selectedRes && (
         <div className="modal-overlay" onClick={() => setActiveModal(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content unlock-pulse-success" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 style={{ fontSize: '1.1rem', color: 'var(--success-text)' }}>✓ Access Approved</h2>
               <button className="navbar-btn" onClick={() => setActiveModal(null)}>✕</button>

@@ -858,11 +858,37 @@ code, pre {
 .btn-primary {
   background-color: var(--primary);
   color: #ffffff;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::after,
+.action-btn-primary::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -60%;
+  width: 25%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(30deg);
+  transition: all 0.65s cubic-bezier(0.19, 1, 0.22, 1);
+  pointer-events: none;
+}
+
+.btn-primary:hover::after,
+.action-btn-primary:hover::after {
+  left: 140%;
 }
 
 .btn-primary:hover {
   background-color: var(--primary-hover);
-  box-shadow: 0 4px 12px var(--primary-glow);
+  box-shadow: 0 4px 14px var(--primary-glow);
   transform: translateY(-1px);
 }
 
@@ -902,6 +928,34 @@ code, pre {
 
 .btn-full {
   width: 100%;
+}
+
+/* ==========================================================================
+   ZERO-TRUST VERIFICATION & UNLOCK PULSE ANIMATION
+   ========================================================================== */
+
+@keyframes verifySuccessPulse {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  60% {
+    transform: scale(1.015);
+    box-shadow: 0 0 0 18px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.unlock-pulse-success {
+  animation: verifySuccessPulse 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border-color: #10b981 !important;
+}
+
+.verify-badge-pulse {
+  animation: verifySuccessPulse 1.4s ease-out infinite;
 }
 
 /* ==========================================================================
@@ -948,6 +1002,8 @@ code, pre {
   color: #ffffff !important;
   box-shadow: 0 2px 6px var(--primary-glow);
   border: 1px solid rgba(255, 255, 255, 0.15);
+  position: relative;
+  overflow: hidden;
 }
 
 .action-btn-primary:hover {
