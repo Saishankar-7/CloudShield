@@ -102,13 +102,15 @@ const loginUser = async (req, res) => {
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      // Record failed attempt
-      user.security.failedLoginAttempts += 1;
-      if (user.security.failedLoginAttempts >= 5) {
-        user.status = 'blocked';
-        user.security.lockedUntil = new Date(Date.now() + 30 * 60000); // lock 30 mins
-      }
-      await user.save();
+      // Record failed attempt atomically
+      const attempts = (user.security?.failedLoginAttempts || 0) + 1;
+      const isLocked = attempts >= 5;
+      await User.findByIdAndUpdate(user._id, {
+        $set: {
+          'security.failedLoginAttempts': attempts,
+          ...(isLocked ? { status: 'blocked', 'security.lockedUntil': new Date(Date.now() + 30 * 60000) } : {}),
+        },
+      });
 
       // Log failure
       await loggingService.logEvent({
@@ -443,8 +445,9 @@ const confirmMfa = async (req, res) => {
     otpRecord.verified = true;
     await otpRecord.save();
 
-    user.security.mfaEnabled = true;
-    await user.save();
+    await User.findByIdAndUpdate(user._id, {
+      $set: { 'security.mfaEnabled': true },
+    });
 
     res.status(200).json({
       mfaEnabled: true,
@@ -464,10 +467,16 @@ const updatePreferences = async (req, res) => {
     const user = await User.findById(req.user._id);
 
     if (user) {
-      if (emailNotifications !== undefined) user.preferences.emailNotifications = emailNotifications;
-      if (darkMode !== undefined) user.preferences.darkMode = darkMode;
-      await user.save();
-      return res.status(200).json(user.preferences);
+      const updateObj = {};
+      if (emailNotifications !== undefined) updateObj['preferences.emailNotifications'] = emailNotifications;
+      if (darkMode !== undefined) updateObj['preferences.darkMode'] = darkMode;
+      
+      const updatedUser = await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: updateObj },
+        { new: true }
+      );
+      return res.status(200).json(updatedUser.preferences);
     }
     res.status(404).json({ message: 'User not found' });
   } catch (error) {
@@ -485,9 +494,12 @@ const disableMfa = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    user.security.mfaEnabled = false;
-    user.security.mfaSecret = null;
-    await user.save();
+    await User.findByIdAndUpdate(req.user._id, {
+      $set: {
+        'security.mfaEnabled': false,
+        'security.mfaSecret': null,
+      },
+    });
 
     const ip = req.headers['x-simulated-ip'] || req.ip || '192.168.1.10';
     await loggingService.logEvent({

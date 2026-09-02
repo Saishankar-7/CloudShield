@@ -1,3 +1,4 @@
+const User = require('../models/User');
 const SecurityAlert = require('../models/SecurityAlert');
 const calculateRisk = require('../utils/calculateRisk');
 const logger = require('../utils/logger');
@@ -10,9 +11,10 @@ const riskEngine = {
     // Calculate risk
     const { score, riskLevel } = calculateRisk({ user, resource, deviceInfo, locationInfo, policy });
 
-    // Update user snapshot risk score
+    // Update user snapshot risk score atomically
     user.riskScore = score;
-    await user.save();
+    user.riskLevel = riskLevel;
+    await User.findByIdAndUpdate(user._id, { $set: { riskScore: score, riskLevel } });
 
     // Create a security alert if the score is High or Critical
     if (score >= 61) {
