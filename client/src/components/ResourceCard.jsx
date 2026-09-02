@@ -155,9 +155,9 @@ const ResourceCard = ({ resource, onAccess, onRequestAccess }) => {
         </div>
         <p className="res-desc">{description}</p>
         {isCloudPdf && cloudStorage?.fileName && (
-          <div style={{ marginTop: 8, fontSize: '0.7rem', color: 'var(--text-muted)', backgroundColor: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ marginTop: 8, fontSize: '0.7rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: 6 }}>
             <FileText size={12} style={{ color: '#ef4444' }} />
-            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cloudStorage.fileName}</span>
+            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>{cloudStorage.fileName}</span>
             {cloudStorage.fileSize && <span>({cloudStorage.fileSize})</span>}
           </div>
         )}

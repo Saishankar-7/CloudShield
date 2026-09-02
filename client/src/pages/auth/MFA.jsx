@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import BrandLogo from '../../components/BrandLogo';
-import { KeyRound, AlertCircle } from 'lucide-react';
+import { KeyRound, AlertCircle, Shield } from 'lucide-react';
 
 const MFA = () => {
   const [code, setCode] = useState('');
@@ -81,6 +81,10 @@ const MFA = () => {
             <span>Confirm Identity</span>
           </button>
         </form>
+        <div style={{ marginTop: 24, padding: '14px', border: '1px dashed var(--warning-border)', backgroundColor: 'var(--warning-bg)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', color: 'var(--warning-text)', lineHeight: 1.4 }}>
+          <span style={{ fontWeight: 600, display: 'block', marginBottom: 4 }}>💡 Testing Bypass Code:</span>
+          For convenience, enter code <code>123456</code> to bypass the multi-factor validation gate.
+        </div>
       </div>
     </div>
   );

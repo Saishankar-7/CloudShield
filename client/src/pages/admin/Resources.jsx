@@ -348,7 +348,7 @@ const Resources = () => {
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {res.cloudStorage?.isCloudPdf ? (
-                      <div style={{ color: '#ef4444', backgroundColor: '#fee2e2', padding: 6, borderRadius: 'var(--radius-sm)' }}>
+                      <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-bg)', padding: 6, borderRadius: 'var(--radius-sm)' }}>
                         <FileText size={16} />
                       </div>
                     ) : (
@@ -547,7 +547,7 @@ const Resources = () => {
                                 padding: '8px 6px',
                                 borderRadius: 'var(--radius-sm)',
                                 border: `1.5px solid ${cloudProvider === prov.name ? 'var(--primary)' : 'var(--border-color)'}`,
-                                backgroundColor: cloudProvider === prov.name ? 'rgba(59, 130, 246, 0.1)' : '#ffffff',
+                                backgroundColor: cloudProvider === prov.name ? 'var(--primary-light)' : 'var(--bg-card-subtle)',
                                 fontSize: '0.75rem',
                                 fontWeight: 600,
                                 cursor: 'pointer',
@@ -555,7 +555,8 @@ const Resources = () => {
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 gap: 4,
-                                color: 'var(--text-primary)',
+                                color: cloudProvider === prov.name ? 'var(--primary)' : 'var(--text-primary)',
+                                transition: 'all 0.15s ease',
                               }}
                             >
                               <span>{prov.icon}</span>
@@ -592,11 +593,11 @@ const Resources = () => {
                           <label className="form-label">Select Document from Laptop</label>
                           <div
                             style={{
-                              border: `2px dashed ${uploadSuccess ? '#10b981' : '#cbd5e1'}`,
+                              border: `2px dashed ${uploadSuccess ? 'var(--success)' : 'var(--border-input)'}`,
                               borderRadius: 'var(--radius-sm)',
                               padding: '22px 16px',
                               textAlign: 'center',
-                              backgroundColor: uploadSuccess ? 'rgba(16, 185, 129, 0.04)' : '#ffffff',
+                              backgroundColor: uploadSuccess ? 'var(--success-bg)' : 'var(--bg-card-subtle)',
                               cursor: uploadingFile ? 'wait' : 'pointer',
                               transition: 'all 0.2s ease',
                             }}
@@ -830,7 +831,7 @@ const Resources = () => {
           <div className="modal-content" style={{ maxWidth: '620px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: 8, borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', padding: 8, borderRadius: 'var(--radius-sm)' }}>
                   <FileText size={20} />
                 </div>
                 <div>
@@ -843,36 +844,36 @@ const Resources = () => {
               </button>
             </div>
             <div className="modal-body">
-              <div style={{ backgroundColor: '#f8fafc', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '16px', marginBottom: 16 }}>
+              <div style={{ backgroundColor: 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '16px', marginBottom: 16 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: '0.85rem' }}>
                   <div>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>Storage Provider</span>
-                    <strong style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <strong style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, color: 'var(--text-primary)' }}>
                       <Cloud size={14} style={{ color: 'var(--primary)' }} />
                       <span>{viewingCloudAsset.cloudStorage?.provider || 'AWS S3'}</span>
                     </strong>
                   </div>
                   <div>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>Bucket / Container</span>
-                    <strong>{viewingCloudAsset.cloudStorage?.bucketName || 'cloudshield-vault'}</strong>
+                    <strong style={{ color: 'var(--text-primary)' }}>{viewingCloudAsset.cloudStorage?.bucketName || 'cloudshield-vault'}</strong>
                   </div>
                   <div>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>File Name</span>
-                    <strong>{viewingCloudAsset.cloudStorage?.fileName || viewingCloudAsset.name + '.pdf'}</strong>
+                    <strong style={{ color: 'var(--text-primary)' }}>{viewingCloudAsset.cloudStorage?.fileName || viewingCloudAsset.name + '.pdf'}</strong>
                   </div>
                   <div>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>File Size</span>
-                    <strong>{viewingCloudAsset.cloudStorage?.fileSize || '2.4 MB'}</strong>
+                    <strong style={{ color: 'var(--text-primary)' }}>{viewingCloudAsset.cloudStorage?.fileSize || '2.4 MB'}</strong>
                   </div>
                   <div style={{ gridColumn: 'span 2' }}>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>Storage URI</span>
-                    <code style={{ fontSize: '0.75rem', wordBreak: 'break-all', display: 'block', backgroundColor: '#e2e8f0', padding: '4px 8px', borderRadius: '4px', marginTop: 4 }}>
+                    <code style={{ fontSize: '0.75rem', wordBreak: 'break-all', display: 'block', backgroundColor: 'var(--bg-app)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', padding: '6px 10px', borderRadius: '4px', marginTop: 4 }}>
                       {viewingCloudAsset.cloudStorage?.fileUrl?.startsWith('data:') ? 'Embedded Cloud PDF Stream (base64)' : viewingCloudAsset.cloudStorage?.fileUrl || viewingCloudAsset.identifier}
                     </code>
                   </div>
                   <div style={{ gridColumn: 'span 2' }}>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'block' }}>Encryption</span>
-                    <span style={{ color: 'var(--success-text, #059669)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <span style={{ color: 'var(--success-text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                       <Lock size={12} />
                       <span>{viewingCloudAsset.cloudStorage?.encryption || 'AES-256 Server-Side Encryption'}</span>
                     </span>
@@ -880,50 +881,54 @@ const Resources = () => {
                 </div>
               </div>
 
-              {viewingCloudAsset.cloudStorage?.fileUrl && (
-                <div>
-                  {viewingCloudAsset.cloudStorage.fileUrl.endsWith('.pdf') || viewingCloudAsset.cloudStorage.fileType === 'application/pdf' ? (
+              {(() => {
+                const token = localStorage.getItem('token');
+                const streamUrl = `/api/resources/${viewingCloudAsset._id}/stream?token=${token}`;
+                const downloadUrl = `/api/resources/${viewingCloudAsset._id}/stream?token=${token}&download=true`;
+
+                return (
+                  <div>
                     <div style={{ marginBottom: 14 }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
                         Live Document Stream Preview
                       </span>
                       <iframe
-                        src={viewingCloudAsset.cloudStorage.fileUrl}
+                        src={streamUrl}
                         title="Document Preview"
                         style={{
                           width: '100%',
                           height: '240px',
                           border: '1px solid var(--border-color)',
                           borderRadius: 'var(--radius-sm)',
-                          backgroundColor: '#f1f5f9',
+                          backgroundColor: 'var(--bg-card-subtle)',
                         }}
                       />
                     </div>
-                  ) : null}
 
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-                    <a
-                      href={viewingCloudAsset.cloudStorage.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-primary"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', padding: '8px 18px' }}
-                    >
-                      <ExternalLink size={14} />
-                      <span>Open Document in New Tab</span>
-                    </a>
-                    <a
-                      href={viewingCloudAsset.cloudStorage.fileUrl}
-                      download={viewingCloudAsset.cloudStorage.fileName || 'document.pdf'}
-                      className="btn btn-secondary"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', padding: '8px 18px' }}
-                    >
-                      <HardDrive size={14} />
-                      <span>Download File</span>
-                    </a>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <a
+                        href={streamUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', padding: '8px 18px', textDecoration: 'none' }}
+                      >
+                        <ExternalLink size={14} />
+                        <span>Open Document in New Tab</span>
+                      </a>
+                      <a
+                        href={downloadUrl}
+                        download={viewingCloudAsset.cloudStorage?.fileName || 'document.pdf'}
+                        className="btn btn-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', padding: '8px 18px', textDecoration: 'none' }}
+                      >
+                        <HardDrive size={14} />
+                        <span>Download File</span>
+                      </a>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary btn-sm" onClick={() => setViewingCloudAsset(null)}>Close</button>
@@ -974,25 +979,25 @@ const Resources = () => {
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                     {[
-                      { id: 'Active', label: 'Active', desc: 'Available to permitted users', color: '#059669', bg: '#f0fdf4' },
-                      { id: 'Restricted', label: 'Restricted', desc: 'Requires step-up approval', color: '#d97706', bg: '#fffbeb' },
-                      { id: 'Revoked', label: 'Revoked', desc: 'Access blocked for all users', color: '#dc2626', bg: '#fef2f2' },
+                      { id: 'Active', label: 'Active', desc: 'Available to permitted users', color: 'var(--success-text)', bg: 'var(--success-bg)', border: 'var(--success)' },
+                      { id: 'Restricted', label: 'Restricted', desc: 'Requires step-up approval', color: 'var(--warning-text)', bg: 'var(--warning-bg)', border: 'var(--warning)' },
+                      { id: 'Revoked', label: 'Revoked', desc: 'Access blocked for all users', color: 'var(--danger-text)', bg: 'var(--danger-bg)', border: 'var(--danger)' },
                     ].map((item) => (
                       <div
                         key={item.id}
                         onClick={() => setAccessStatus(item.id)}
                         style={{
-                          border: accessStatus === item.id ? `2px solid ${item.color}` : '1px solid var(--border-color)',
-                          backgroundColor: accessStatus === item.id ? item.bg : '#fff',
+                          border: accessStatus === item.id ? `2px solid ${item.border}` : '1px solid var(--border-color)',
+                          backgroundColor: accessStatus === item.id ? item.bg : 'var(--bg-card-subtle)',
                           borderRadius: '8px',
-                          padding: '10px',
+                          padding: '12px 10px',
                           cursor: 'pointer',
                           textAlign: 'center',
-                          transition: 'all 0.2s',
+                          transition: 'all 0.15s ease',
                         }}
                       >
-                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: item.color }}>{item.label}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>{item.desc}</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: accessStatus === item.id ? item.color : 'var(--text-primary)' }}>{item.label}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.3 }}>{item.desc}</div>
                       </div>
                     ))}
                   </div>
@@ -1014,17 +1019,18 @@ const Resources = () => {
                         onClick={() => setAccessMfa(mfa.id)}
                         style={{
                           border: accessMfa === mfa.id ? '2px solid var(--primary)' : '1px solid var(--border-color)',
-                          backgroundColor: accessMfa === mfa.id ? 'rgba(59, 130, 246, 0.08)' : '#fff',
+                          backgroundColor: accessMfa === mfa.id ? 'var(--primary-light)' : 'var(--bg-card-subtle)',
                           borderRadius: '8px',
-                          padding: '10px',
+                          padding: '12px 10px',
                           cursor: 'pointer',
                           textAlign: 'center',
+                          transition: 'all 0.15s ease',
                         }}
                       >
-                        <div style={{ fontWeight: 700, fontSize: '0.825rem', color: accessMfa === mfa.id ? 'var(--primary)' : 'var(--text-main)' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.825rem', color: accessMfa === mfa.id ? 'var(--primary)' : 'var(--text-primary)' }}>
                           {mfa.label}
                         </div>
-                        <div style={{ fontSize: '0.675rem', color: 'var(--text-muted)', marginTop: 2 }}>{mfa.desc}</div>
+                        <div style={{ fontSize: '0.675rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.3 }}>{mfa.desc}</div>
                       </div>
                     ))}
                   </div>
@@ -1044,14 +1050,14 @@ const Resources = () => {
                           type="button"
                           onClick={() => handleToggleDept(dept)}
                           style={{
-                            padding: '5px 10px',
+                            padding: '6px 12px',
                             borderRadius: '20px',
                             fontSize: '0.75rem',
                             fontWeight: 600,
                             cursor: 'pointer',
                             border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                            backgroundColor: isSelected ? 'var(--primary)' : '#f8fafc',
-                            color: isSelected ? '#fff' : 'var(--text-muted)',
+                            backgroundColor: isSelected ? 'var(--primary)' : 'var(--bg-card-subtle)',
+                            color: isSelected ? '#ffffff' : 'var(--text-secondary)',
                             transition: 'all 0.15s ease',
                           }}
                         >
@@ -1076,14 +1082,15 @@ const Resources = () => {
                           type="button"
                           onClick={() => handleToggleRole(role.id)}
                           style={{
-                            padding: '6px 14px',
+                            padding: '8px 16px',
                             borderRadius: '8px',
-                            fontSize: '0.75rem',
+                            fontSize: '0.8rem',
                             fontWeight: 600,
                             cursor: 'pointer',
-                            border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                            backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : '#f8fafc',
-                            color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                            border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                            backgroundColor: isSelected ? 'var(--primary-light)' : 'var(--bg-card-subtle)',
+                            color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
+                            transition: 'all 0.15s ease',
                           }}
                         >
                           {role.label} {isSelected && '✓'}

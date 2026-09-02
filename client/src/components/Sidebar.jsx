@@ -14,7 +14,10 @@ import {
   Terminal,
   Activity,
   BarChart3,
-  KeyRound
+  KeyRound,
+  Radio,
+  FileCode,
+  ShieldAlert
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -30,24 +33,32 @@ const Sidebar = () => {
 
   const isAdmin = user.role === 'admin';
 
-  // Navigation lists matching screenshots
+  // Organized menus with section categorizations
   const employeeMenu = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'My Resources', path: '/resources', icon: FolderLock },
-    { name: 'My Requests', path: '/requests', icon: Inbox },
-    { name: 'Access History', path: '/history', icon: History },
-    { name: 'Profile', path: '/profile', icon: User },
-    { name: 'Security', path: '/security', icon: Lock },
+    { section: 'OPERATIONS', items: [
+      { name: 'Command Center', path: '/', icon: LayoutDashboard },
+      { name: 'Resource Vault', path: '/resources', icon: FolderLock },
+      { name: 'Access Requests', path: '/requests', icon: Inbox },
+    ]},
+    { section: 'GOVERNANCE & IDENTITY', items: [
+      { name: 'Access History', path: '/history', icon: History },
+      { name: 'Identity Profile', path: '/profile', icon: User },
+      { name: 'Security Posture', path: '/security', icon: Lock },
+    ]}
   ];
 
   const adminMenu = [
-    { name: 'Admin Dashboard', path: '/admin', icon: LayoutDashboard },
-    { name: 'User Management', path: '/admin/users', icon: Users },
-    { name: 'Resources', path: '/admin/resources', icon: FolderLock },
-    { name: 'Access Requests', path: '/admin/requests', icon: Inbox },
-    { name: 'Security Logs', path: '/admin/logs', icon: Terminal },
-    { name: 'Risk Monitor', path: '/admin/risk', icon: Activity },
-    { name: 'Reports & Analytics', path: '/admin/reports', icon: BarChart3 },
+    { section: 'SOC COMMAND', items: [
+      { name: 'Admin Command', path: '/admin', icon: LayoutDashboard },
+      { name: 'Risk Telemetry', path: '/admin/risk', icon: Activity },
+      { name: 'Security Audit Logs', path: '/admin/logs', icon: Terminal },
+    ]},
+    { section: 'ACCESS MANAGEMENT', items: [
+      { name: 'User Directory', path: '/admin/users', icon: Users },
+      { name: 'Resource Catalog', path: '/admin/resources', icon: FolderLock },
+      { name: 'Access Approvals', path: '/admin/requests', icon: Inbox },
+      { name: 'Reports & Analytics', path: '/admin/reports', icon: BarChart3 },
+    ]}
   ];
 
   const currentMenu = isAdmin ? adminMenu : employeeMenu;
@@ -57,30 +68,42 @@ const Sidebar = () => {
       <div className="sidebar-logo">
         <BrandLogo size={32} glow={true} />
         <div>
-          <span className="sidebar-logo-text">Cloud Shield</span>
-          <span className="sidebar-logo-sub">Zero Trust Security</span>
+          <div className="sidebar-logo-text">
+            <span>CLOUD</span><span style={{ color: 'var(--primary, #38bdf8)' }}>SHIELD</span>
+          </div>
+          <span className="sidebar-logo-sub">Zero Trust Core</span>
         </div>
       </div>
 
-      <nav style={{ flexGrow: 1 }}>
-        <ul className="sidebar-menu">
-          {currentMenu.map((item) => (
-            <li key={item.name} className="sidebar-item">
-              <NavLink
-                to={item.path}
-                className={({ isActive }) => (isActive ? 'active' : '')}
-                end={item.path === '/' || item.path === '/admin'}
-              >
-                <item.icon size={18} />
-                <span>{item.name}</span>
-              </NavLink>
-            </li>
-          ))}
-        </ul>
+      <nav className="sidebar-nav-container">
+        {currentMenu.map((group) => (
+          <div key={group.section} className="sidebar-section-group">
+            <span className="sidebar-section-title">{group.section}</span>
+            <ul className="sidebar-menu">
+              {group.items.map((item) => (
+                <li key={item.name} className="sidebar-item">
+                  <NavLink
+                    to={item.path}
+                    className={({ isActive }) => (isActive ? 'active' : '')}
+                    end={item.path === '/' || item.path === '/admin'}
+                  >
+                    <item.icon size={18} className="sidebar-nav-icon" />
+                    <span>{item.name}</span>
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       <div className="sidebar-footer">
-        <div className="sidebar-user" style={{ marginBottom: 12 }}>
+        <div className="sidebar-telemetry-badge">
+          <span className="telemetry-live-dot"></span>
+          <span>ZT Engine: Active</span>
+        </div>
+
+        <div className="sidebar-user">
           <div
             className="avatar"
             style={user.avatarUrl ? { backgroundImage: `url(${user.avatarUrl})` } : {}}
@@ -89,17 +112,16 @@ const Sidebar = () => {
           </div>
           <div className="user-info">
             <div className="user-name">{user.fullName}</div>
-            <div className="user-role">{user.jobTitle || 'Employee'}</div>
+            <div className="user-role">{user.jobTitle || (isAdmin ? 'Security Officer' : 'Staff Engineer')}</div>
           </div>
         </div>
 
         <button
           onClick={handleLogout}
-          className="btn btn-secondary btn-full btn-sm"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          className="btn btn-secondary btn-full btn-sm sidebar-logout-btn"
         >
-          <LogOut size={16} />
-          <span>Logout</span>
+          <LogOut size={15} />
+          <span>Secure Sign Out</span>
         </button>
       </div>
     </aside>

@@ -657,7 +657,7 @@ const UserManagement = () => {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: 10, borderRadius: '50%' }}>
+              <div style={{ backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', padding: 10, borderRadius: '50%' }}>
                 <Trash2 size={24} />
               </div>
               <div>

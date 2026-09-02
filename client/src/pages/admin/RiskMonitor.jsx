@@ -180,11 +180,11 @@ const RiskMonitor = () => {
                   </div>
                 )}
 
-                <div style={{ fontSize: '0.85rem', lineHeight: 1.5, marginBottom: 16, backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
+                <div style={{ fontSize: '0.85rem', lineHeight: 1.5, marginBottom: 16, backgroundColor: 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', padding: '14px', borderRadius: '8px' }}>
                   <span style={{ fontWeight: 700, display: 'block', marginBottom: 4, textTransform: 'uppercase', fontSize: '0.7rem', color: 'var(--text-muted)' }}>Incident Description</span>
-                  {selectedAlert.description}
-                  <div style={{ marginTop: 8 }}>
-                    IP: <b>{selectedAlert.ipAddress}</b> | Location: <b>{selectedAlert.location}</b>
+                  <div>{selectedAlert.description}</div>
+                  <div style={{ marginTop: 8, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                    IP: <b style={{ color: 'var(--text-primary)' }}>{selectedAlert.ipAddress}</b> | Location: <b style={{ color: 'var(--text-primary)' }}>{selectedAlert.location}</b>
                   </div>
                 </div>
 
