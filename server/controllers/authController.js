@@ -614,6 +614,7 @@ module.exports = {
   getUserProfile,
   setupMfa,
   confirmMfa,
+  resendMfa,
   updatePreferences,
   disableMfa,
 };
