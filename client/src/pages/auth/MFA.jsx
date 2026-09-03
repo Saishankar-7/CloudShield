@@ -16,10 +16,10 @@ const MFA = () => {
   const [error, setError] = useState('');
   const [resending, setResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState('');
-  const { verifyMfaCode, mfaTempData } = useAuth();
+  const { verifyMfaCode, resendMfaCode, mfaTempData } = useAuth();
   const navigate = useNavigate();
 
-  const targetEmail = mfaTempData?.maskedEmail || mfaTempData?.email || 'your registered email';
+  const targetEmail = mfaTempData?.email || mfaTempData?.maskedEmail || 'your registered email';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -48,11 +48,10 @@ const MFA = () => {
     setError('');
     setResendSuccess('');
     try {
-      // Small timeout to emulate resend trigger
-      await new Promise((r) => setTimeout(r, 600));
-      setResendSuccess(`A new verification code has been dispatched to ${targetEmail}`);
+      const data = await resendMfaCode();
+      setResendSuccess(data?.message || `A new verification code has been dispatched to ${targetEmail}`);
     } catch (err) {
-      setError('Failed to resend verification code. Please try again.');
+      setError(err.message || 'Failed to resend verification code. Please try again.');
     } finally {
       setResending(false);
     }

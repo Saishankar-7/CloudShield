@@ -7,6 +7,7 @@ const {
   getUserProfile,
   setupMfa,
   confirmMfa,
+  resendMfa,
   updatePreferences,
   disableMfa,
 } = require('../controllers/authController');
@@ -19,6 +20,7 @@ router.get('/profile', protect, getUserProfile);
 router.post('/mfa/setup', protect, setupMfa);
 router.post('/mfa/confirm', protect, confirmMfa);
 router.post('/mfa/verify', protect, confirmMfa);
+router.post('/mfa/resend', protect, resendMfa);
 router.post('/mfa/disable', protect, disableMfa);
 router.put('/preferences', protect, updatePreferences);
 

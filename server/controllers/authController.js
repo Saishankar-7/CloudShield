@@ -222,10 +222,7 @@ const loginUser = async (req, res) => {
         description: 'A sign-in request was detected. Enter this verification code to complete login.',
       });
 
-      const targetEmail =
-        (user.email.endsWith('@company.com') || user.email.endsWith('@example.com')) && process.env.EMAIL_USER
-          ? process.env.EMAIL_USER
-          : user.email;
+      const targetEmail = user.email;
 
       const maskEmail = (email) => {
         if (!email) return '';
@@ -263,6 +260,47 @@ const loginUser = async (req, res) => {
   } catch (error) {
     logger.error(`Login error: ${error.message}`);
     res.status(500).json({ message: 'Server Error during login', error: error.message });
+  }
+};
+
+/**
+ * Resend 6-Digit MFA Login OTP
+ */
+const resendMfa = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const otp = mfaService.generateNumericOtp();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await DocumentOtp.deleteMany({ user: user._id, purpose: 'login_mfa', verified: false });
+
+    const docOtp = new DocumentOtp({
+      user: user._id,
+      email: user.email,
+      otp,
+      expiresAt,
+      purpose: 'login_mfa',
+    });
+    await docOtp.save();
+
+    await emailService.sendMfaSecurityOtp({
+      user,
+      otp,
+      title: 'Login Identity Verification',
+      description: 'A new sign-in verification code was requested for your account.',
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `A new verification code has been dispatched to ${user.email}`,
+    });
+  } catch (error) {
+    logger.error(`resendMfa error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to resend verification code', error: error.message });
   }
 };
 

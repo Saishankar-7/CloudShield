@@ -115,6 +115,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const resendMfaCode = async () => {
+    if (!mfaTempData?.tempToken) {
+      throw new Error('No active MFA session found. Please try logging in again.');
+    }
+    try {
+      const data = await apiFetch('/auth/mfa/resend', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${mfaTempData.tempToken}`,
+        },
+      });
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -141,6 +158,7 @@ export const AuthProvider = ({ children }) => {
     mfaTempData,
     login,
     verifyMfaCode,
+    resendMfaCode,
     register,
     logout,
     refreshProfile,
