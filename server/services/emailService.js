@@ -121,21 +121,16 @@ const getTransporter = async () => {
     const cleanUser = emailUser.trim();
     const cleanPass = emailPass.trim().replace(/\s+/g, '');
     transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
+      service: 'gmail',
       auth: {
         user: cleanUser,
         pass: cleanPass,
       },
-      connectionTimeout: 4000,
-      greetingTimeout: 4000,
-      socketTimeout: 5000,
-      tls: {
-        rejectUnauthorized: false,
-      },
+      connectionTimeout: 6000,
+      greetingTimeout: 6000,
+      socketTimeout: 8000,
     });
-    logger.info(`Nodemailer: Connected via Gmail Direct SSL (smtp.gmail.com:465) for ${cleanUser}`);
+    logger.info(`Nodemailer: Connected via Admin Gmail account (${cleanUser})`);
   } else {
     logger.warn('Nodemailer: No EMAIL_USER/EMAIL_PASS in .env. Initializing in-app fallback logger...');
     transporter = {
@@ -392,7 +387,30 @@ const emailService = {
     const html = buildDocumentOtpHtml({ user: { ...user, email: recipientEmail }, resource, otp, deviceInfo, locationInfo });
     const text = `CloudShield Document Access OTP: ${otp}\n\nYou have requested access to "${resource?.name || 'Protected Document'}".\nThis OTP is valid for 10 minutes.\n\nTarget Email: ${recipientEmail}\nIf you did not request this, please contact your security administrator.`;
 
-    // 1. Primary Dispatch: Resend HTTPS REST API (Port 443 - 100% Render compatible)
+    // 1. Primary Dispatch: Send from Admin Account via Gmail SMTP
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      try {
+        const activeTransporter = await getTransporter();
+        const fromAddress = process.env.SMTP_FROM || `"CloudShield Admin" <${process.env.EMAIL_USER.trim()}>`;
+
+        logger.info(`EmailService: Sending OTP from Admin account (${process.env.EMAIL_USER}) to user (${recipientEmail})...`);
+
+        const info = await activeTransporter.sendMail({
+          from: fromAddress,
+          to: recipientEmail,
+          subject,
+          text,
+          html,
+        });
+
+        logger.info(`EmailService: Successfully dispatched document access OTP from Admin to ${recipientEmail} (Message ID: ${info.messageId})`);
+        return { success: true, messageId: info.messageId, provider: 'Admin Gmail SMTP' };
+      } catch (smtpErr) {
+        logger.warn(`EmailService: Gmail SMTP dispatch failed (${smtpErr.message}). Attempting Resend HTTPS API failover...`);
+      }
+    }
+
+    // 2. Secondary Failover Dispatch: Resend HTTPS REST API (Port 443 - 100% Cloud compatible)
     if (process.env.RESEND_API_KEY) {
       const resendResult = await sendViaResendApi({ to: recipientEmail, subject, html, text });
       if (resendResult?.success) {
@@ -400,35 +418,13 @@ const emailService = {
       }
     }
 
-    // 2. Secondary Fallback: Nodemailer SMTP
-    try {
-      const activeTransporter = await getTransporter();
-      const fromAddress = process.env.SMTP_FROM || process.env.EMAIL_USER || '"CloudShield Security" <security@cloudshield.internal>';
-
-      const info = await activeTransporter.sendMail({
-        from: fromAddress,
-        to: recipientEmail,
-        subject,
-        text,
-        html,
-      });
-
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      if (previewUrl) {
-        logger.info(`Nodemailer Delivery Preview Link: ${previewUrl}`);
-      }
-
-      logger.info(`EmailService: Successfully dispatched document access OTP to ${recipientEmail} (Message ID: ${info.messageId})`);
-      return { success: true, messageId: info.messageId, simulated: !process.env.EMAIL_USER, previewUrl };
-    } catch (err) {
-      logger.warn(`EmailService: SMTP dispatch to ${recipientEmail} failed (${err.message}).`);
-      return { success: false, error: err.message };
-    }
+    logger.warn(`EmailService: Unable to deliver OTP to ${recipientEmail}. Please check EMAIL_USER/EMAIL_PASS or RESEND_API_KEY.`);
+    return { success: false, error: 'Email delivery failed' };
   },
 
   /**
    * Sends 6-digit MFA OTP email for Account MFA Setup or Login Challenge.
-   * Priority: Resend HTTPS API (Port 443) -> Nodemailer SMTP Fallback.
+   * Sends from Admin Account directly to User Account.
    */
   sendMfaSecurityOtp: async ({ user, otp, title = 'Security Verification', description = 'Account Authentication Challenge' }) => {
     let recipientEmail = user.email;
@@ -449,7 +445,30 @@ const emailService = {
       otp,
     });
 
-    // 1. Primary Dispatch: Resend HTTPS REST API (Port 443 - 100% Render compatible)
+    // 1. Primary Dispatch: Send from Admin Account via Gmail SMTP
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      try {
+        const activeTransporter = await getTransporter();
+        const fromAddress = process.env.SMTP_FROM || `"CloudShield Admin" <${process.env.EMAIL_USER.trim()}>`;
+
+        logger.info(`EmailService: Sending MFA OTP from Admin account (${process.env.EMAIL_USER}) to user (${recipientEmail})...`);
+
+        const info = await activeTransporter.sendMail({
+          from: fromAddress,
+          to: recipientEmail,
+          subject,
+          text,
+          html,
+        });
+
+        logger.info(`EmailService: Successfully dispatched MFA Security OTP from Admin to ${recipientEmail} (Message ID: ${info.messageId})`);
+        return { success: true, messageId: info.messageId, provider: 'Admin Gmail SMTP' };
+      } catch (smtpErr) {
+        logger.warn(`EmailService: Gmail SMTP dispatch failed (${smtpErr.message}). Attempting Resend HTTPS API failover...`);
+      }
+    }
+
+    // 2. Secondary Failover Dispatch: Resend HTTPS REST API (Port 443)
     if (process.env.RESEND_API_KEY) {
       const resendResult = await sendViaResendApi({ to: recipientEmail, subject, html, text });
       if (resendResult?.success) {
@@ -457,30 +476,8 @@ const emailService = {
       }
     }
 
-    // 2. Secondary Fallback: Nodemailer SMTP
-    try {
-      const activeTransporter = await getTransporter();
-      const fromAddress = process.env.SMTP_FROM || process.env.EMAIL_USER || '"CloudShield Security" <security@cloudshield.internal>';
-
-      const info = await activeTransporter.sendMail({
-        from: fromAddress,
-        to: recipientEmail,
-        subject,
-        text,
-        html,
-      });
-
-      const previewUrl = nodemailer.getTestMessageUrl(info);
-      if (previewUrl) {
-        logger.info(`Nodemailer Delivery Preview Link: ${previewUrl}`);
-      }
-
-      logger.info(`EmailService: Successfully dispatched MFA Security OTP to ${recipientEmail} (Message ID: ${info.messageId})`);
-      return { success: true, messageId: info.messageId, simulated: !process.env.EMAIL_USER, previewUrl };
-    } catch (err) {
-      logger.warn(`EmailService: SMTP dispatch to ${recipientEmail} failed (${err.message}).`);
-      return { success: false, error: err.message };
-    }
+    logger.warn(`EmailService: Unable to deliver MFA OTP to ${recipientEmail}. Please check EMAIL_USER/EMAIL_PASS or RESEND_API_KEY.`);
+    return { success: false, error: 'Email delivery failed' };
   },
 };
 
