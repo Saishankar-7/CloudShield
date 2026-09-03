@@ -305,7 +305,7 @@ const Resources = () => {
   };
 
   const handleDeleteResource = async (resId) => {
-    if (!window.confirm('Are you sure you want to remove this resource from secure catalog?')) {
+    if (!window.confirm('Are you sure you want to delete this resource? Any associated cloud documents stored in Cloudinary will also be permanently deleted.')) {
       return;
     }
 

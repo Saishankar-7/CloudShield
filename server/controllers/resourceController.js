@@ -1,7 +1,10 @@
+const path = require('path');
+const fs = require('fs');
 const Resource = require('../models/Resource');
 const Policy = require('../models/Policy');
 const AccessRequest = require('../models/AccessRequest');
 const DocumentOtp = require('../models/DocumentOtp');
+const { cloudinary, isCloudinaryConfigured } = require('../config/cloudinary');
 const emailService = require('../services/emailService');
 const mfaService = require('../services/mfaService');
 const loggingService = require('../services/loggingService');
@@ -233,21 +236,118 @@ const updateResource = async (req, res) => {
 };
 
 /**
- * Delete resource (Admin only)
+ * Delete resource and permanently purge associated assets from Cloudinary and local vaults (Admin only)
  */
 const deleteResource = async (req, res) => {
   try {
-    const resource = await Resource.findByIdAndDelete(req.params.id);
+    const resource = await Resource.findById(req.params.id);
     if (!resource) {
       return res.status(404).json({ message: 'Resource not found' });
     }
-    res.status(200).json({ message: 'Resource deleted successfully' });
+
+    let cloudinaryDeleted = false;
+    let cloudinaryPublicId = null;
+
+    const cloud = resource.cloudStorage || {};
+    const cloudUri = cloud.cloudUri || resource.identifier;
+    const targetUrl = cloud.cloudinaryUrl || cloud.fileUrl;
+
+    // 1. Resolve Cloudinary public_id from cloudStorage or URL
+    if (cloud.publicId) {
+      cloudinaryPublicId = cloud.publicId;
+    } else if (cloudUri && typeof cloudUri === 'string' && cloudUri.startsWith('cloudinary://')) {
+      cloudinaryPublicId = cloudUri.replace('cloudinary://', '');
+    } else if (targetUrl && typeof targetUrl === 'string' && targetUrl.includes('cloudinary.com')) {
+      const match = targetUrl.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\?.*)?$/);
+      if (match && match[1]) {
+        cloudinaryPublicId = match[1];
+      }
+    }
+
+    // 2. Permanently delete asset from Cloudinary CDN if public_id is available
+    if (cloudinaryPublicId && isCloudinaryConfigured()) {
+      try {
+        const isImage = cloud.fileType?.startsWith('image/') || /\.(png|jpg|jpeg|webp|gif)$/i.test(cloudinaryPublicId);
+        const primaryType = isImage ? 'image' : 'raw';
+        const fallbackType = isImage ? 'raw' : 'image';
+
+        logger.info(`Deleting Cloudinary asset "${cloudinaryPublicId}" (${primaryType}) for resource "${resource.name}"`);
+        const destroyResult = await cloudinary.uploader.destroy(cloudinaryPublicId, {
+          resource_type: primaryType,
+          invalidate: true,
+        });
+
+        if (destroyResult?.result === 'ok') {
+          cloudinaryDeleted = true;
+          logger.info(`Cloudinary asset "${cloudinaryPublicId}" destroyed successfully (${primaryType})`);
+        } else {
+          // Attempt fallback type in case the asset was stored as image or raw
+          const fallbackResult = await cloudinary.uploader.destroy(cloudinaryPublicId, {
+            resource_type: fallbackType,
+            invalidate: true,
+          });
+          if (fallbackResult?.result === 'ok') {
+            cloudinaryDeleted = true;
+            logger.info(`Cloudinary asset "${cloudinaryPublicId}" destroyed successfully via fallback (${fallbackType})`);
+          } else {
+            logger.warn(`Cloudinary destroy returned: ${JSON.stringify(destroyResult)} / fallback: ${JSON.stringify(fallbackResult)}`);
+          }
+        }
+      } catch (cloudErr) {
+        logger.error(`Error deleting Cloudinary asset "${cloudinaryPublicId}": ${cloudErr.message}`);
+      }
+    }
+
+    // 3. Delete local file from server/uploads/ if present
+    const storedName = cloud.storedName || cloud.fileName;
+    if (storedName) {
+      const localUploadsPath = path.join(__dirname, '../uploads');
+      const localFilePath = path.join(localUploadsPath, storedName);
+      if (fs.existsSync(localFilePath)) {
+        try {
+          fs.unlinkSync(localFilePath);
+          logger.info(`Deleted local file from uploads: ${localFilePath}`);
+        } catch (fsErr) {
+          logger.warn(`Failed to delete local file ${localFilePath}: ${fsErr.message}`);
+        }
+      }
+    }
+
+    // 4. Clean up any related database records (AccessRequests, DocumentOtps)
+    await AccessRequest.deleteMany({ resource: resource._id });
+    await DocumentOtp.deleteMany({ resource: resource._id });
+
+    // 5. Remove resource record from MongoDB
+    await Resource.findByIdAndDelete(resource._id);
+
+    // 6. Record action in audit log
+    await loggingService.logEvent({
+      user: req.user._id,
+      resource: resource._id,
+      eventType: 'Resource Deleted',
+      category: 'Admin Actions',
+      accessAction: 'Delete',
+      ipAddress: req.ip || '127.0.0.1',
+      device: req.headers['user-agent'] || 'Browser',
+      severity: 'Medium',
+      status: 'Success',
+      riskScore: 0,
+      details: `Admin deleted resource "${resource.name}". Cloudinary asset: ${cloudinaryPublicId || 'none'} (Purged from Cloudinary: ${cloudinaryDeleted ? 'Yes' : 'No/Not on Cloudinary'}).`,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: cloudinaryDeleted
+        ? `Resource "${resource.name}" and its cloud document were permanently deleted from Cloudinary.`
+        : `Resource "${resource.name}" deleted successfully.`,
+      cloudinaryDeleted,
+      cloudinaryPublicId,
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to delete resource' });
+    logger.error(`deleteResource error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to delete resource', error: error.message });
   }
 };
-
-const { cloudinary, isCloudinaryConfigured } = require('../config/cloudinary');
 
 /**
  * Upload Document / PDF file from laptop to cloud storage vault (Cloudinary / Local)
@@ -654,9 +754,6 @@ const getEmployeeDataRecords = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch employee records', error: error.message });
   }
 };
-
-const path = require('path');
-const fs = require('fs');
 
 /**
  * Stream or Download Decrypted Resource Document (Cloudinary / Local / Dynamic Generator)
