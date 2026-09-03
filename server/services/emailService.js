@@ -4,8 +4,8 @@ const logger = require('../utils/logger');
 let transporter = null;
 
 /**
- * Dispatches an email via Resend HTTPS REST API (Port 443 - 100% Render and Cloud compatible).
- * Uses process.env.RESEND_API_KEY and process.env.RESEND_FROM (defaults to 'CloudShield Security <onboarding@resend.dev>').
+ * Dispatches an email via Resend HTTPS REST API (Port 443).
+ * Delivers directly to the intended employee user.
  */
 const sendViaResendApi = async ({ to, subject, html, text }) => {
   const apiKey = process.env.RESEND_API_KEY;
@@ -16,8 +16,8 @@ const sendViaResendApi = async ({ to, subject, html, text }) => {
 
   const fromAddress = process.env.RESEND_FROM || 'CloudShield Security <onboarding@resend.dev>';
 
-  const attemptSend = async (targetRecipient, emailSubject, emailHtml, emailText) => {
-    logger.info(`Resend HTTPS API: Sending email to ${targetRecipient} from ${fromAddress}...`);
+  try {
+    logger.info(`Resend HTTPS API: Dispatching email to employee user (${to}) from ${fromAddress}...`);
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -27,71 +27,30 @@ const sendViaResendApi = async ({ to, subject, html, text }) => {
       },
       body: JSON.stringify({
         from: fromAddress,
-        to: [targetRecipient],
-        subject: emailSubject,
-        html: emailHtml,
-        text: emailText,
+        to: [to],
+        subject,
+        html,
+        text,
       }),
     });
 
     const data = await response.json();
     if (!response.ok) {
       const errMsg = data.message || data.error?.message || `Resend API HTTP ${response.status}`;
+      logger.warn(`Resend HTTPS API delivery warning for ${to}: ${errMsg}`);
       return { success: false, error: errMsg, statusCode: response.status };
     }
 
-    return { success: true, messageId: data.id, provider: 'Resend HTTPS API (Port 443)' };
-  };
-
-  try {
-    // 1. First attempt: Direct delivery to intended recipient
-    const firstResult = await attemptSend(to, subject, html, text);
-    if (firstResult.success) {
-      logger.info(`Resend HTTPS API: Successfully delivered email to ${to} (Message ID: ${firstResult.messageId})`);
-      return firstResult;
-    }
-
-    // 2. If blocked by Resend sandbox policy (free onboarding domain allows sending only to verified account email)
-    if (
-      firstResult.error &&
-      (firstResult.error.toLowerCase().includes('only send testing emails') ||
-       firstResult.error.toLowerCase().includes('own email address') ||
-       firstResult.statusCode === 403)
-    ) {
-      // Extract the allowed address if mentioned in error message, or fallback to EMAIL_USER
-      const match = firstResult.error.match(/\(([^)]+@[^)]+)\)/);
-      const fallbackEmail = match ? match[1] : (process.env.EMAIL_USER || 'tumpalasaisankar@gmail.com');
-
-      if (fallbackEmail && fallbackEmail.toLowerCase() !== to.toLowerCase()) {
-        logger.warn(`Resend Sandbox restriction: Cannot deliver directly to ${to}. Auto-routing to registered account: ${fallbackEmail}`);
-
-        const forwardSubject = `[For ${to}] ${subject}`;
-        const forwardHtml = `
-          <div style="background-color: #1e3a8a; color: #ffffff; padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-family: sans-serif; font-size: 13px; line-height: 1.4;">
-            ℹ️ <b>Resend Sandbox Notification:</b> This OTP was generated for user account <b>${to}</b> and safely routed to your verified developer inbox (<b>${fallbackEmail}</b>).
-          </div>
-          ${html}
-        `;
-        const forwardText = `[For ${to}]\n\n${text}`;
-
-        const fallbackResult = await attemptSend(fallbackEmail, forwardSubject, forwardHtml, forwardText);
-        if (fallbackResult.success) {
-          logger.info(`Resend HTTPS API: Successfully delivered OTP to account email ${fallbackEmail} (Message ID: ${fallbackResult.messageId})`);
-          return { success: true, messageId: fallbackResult.messageId, provider: 'Resend HTTPS API (Sandbox Auto-Forward)' };
-        }
-      }
-    }
-
-    logger.error(`Resend HTTPS API Error: ${firstResult.error}`);
-    return null;
+    logger.info(`Resend HTTPS API: Successfully delivered email directly to user (${to}) (Message ID: ${data.id})`);
+    return { success: true, messageId: data.id, provider: 'Resend HTTPS API' };
   } catch (err) {
-    logger.error(`Resend HTTPS API Exception: ${err.message}`);
+    logger.error(`Resend HTTPS API Exception for ${to}: ${err.message}`);
     return null;
   }
 };
 
 /**
- * Initializes or retrieves the Nodemailer transporter instance with fast timeouts for fallback compatibility.
+ * Initializes or retrieves the Nodemailer transporter instance using the Admin credentials as the Sender.
  */
 const getTransporter = async () => {
   if (transporter) return transporter;
@@ -109,14 +68,14 @@ const getTransporter = async () => {
         user: emailUser.trim(),
         pass: emailPass.trim().replace(/\s+/g, ''),
       },
-      connectionTimeout: 4000,
-      greetingTimeout: 4000,
-      socketTimeout: 5000,
+      connectionTimeout: 6000,
+      greetingTimeout: 6000,
+      socketTimeout: 8000,
       tls: {
         rejectUnauthorized: false,
       },
     });
-    logger.info(`Nodemailer: Connected via Custom SMTP (${smtpHost}) for ${emailUser.trim()}`);
+    logger.info(`Nodemailer: Connected via Custom SMTP (${smtpHost}) with Sender Admin: ${emailUser.trim()}`);
   } else if (emailUser && emailPass) {
     const cleanUser = emailUser.trim();
     const cleanPass = emailPass.trim().replace(/\s+/g, '');
@@ -130,9 +89,9 @@ const getTransporter = async () => {
       greetingTimeout: 6000,
       socketTimeout: 8000,
     });
-    logger.info(`Nodemailer: Connected via Admin Gmail account (${cleanUser})`);
+    logger.info(`Nodemailer: Connected via Admin Gmail Sender (${cleanUser})`);
   } else {
-    logger.warn('Nodemailer: No EMAIL_USER/EMAIL_PASS in .env. Initializing in-app fallback logger...');
+    logger.warn('Nodemailer: No EMAIL_USER/EMAIL_PASS configured. Initializing fallback mode...');
     transporter = {
       sendMail: async (mailOptions) => {
         logger.info(`[CLOUD-SHIELD FALLBACK LOG] To: ${mailOptions.to} | Subject: ${mailOptions.subject}`);
@@ -145,17 +104,17 @@ const getTransporter = async () => {
 };
 
 /**
- * Generates modern styled HTML email for MFA Document Access OTP verification.
+ * Builds official corporate HTML email for employee Zero-Trust verification.
  */
-const buildDocumentOtpHtml = ({ user, resource, otp, deviceInfo = {}, locationInfo = {} }) => {
-  const resourceName = resource?.name || 'Protected Enterprise Document';
-  const category = resource?.category || 'Business Asset';
-  const sensitivity = resource?.sensitivity || 'Medium';
-  const userName = user?.fullName || 'CloudShield User';
-  const userEmail = user?.email || 'registered user';
+const buildCorporateOtpHtml = ({ user, resource, otp, title, description, deviceInfo = {}, locationInfo = {} }) => {
+  const resourceName = resource?.name || title || 'Protected Corporate Resource';
+  const category = resource?.category || 'Enterprise Digital Asset';
+  const sensitivity = resource?.sensitivity || 'Confidential';
+  const userName = user?.fullName || 'Valued Employee';
+  const userEmail = user?.email || 'user@company.com';
   const ip = deviceInfo.ip || '192.168.1.10';
-  const device = deviceInfo.deviceName || 'Authorized Browser Session';
-  const location = locationInfo.city && locationInfo.country ? `${locationInfo.city}, ${locationInfo.country}` : 'India';
+  const device = deviceInfo.deviceName || 'Authorized Enterprise Workstation';
+  const location = locationInfo.city && locationInfo.country ? `${locationInfo.city}, ${locationInfo.country}` : 'Enterprise Network';
   const timestamp = new Date().toUTCString();
 
   return `
@@ -169,138 +128,148 @@ const buildDocumentOtpHtml = ({ user, resource, otp, deviceInfo = {}, locationIn
     body {
       margin: 0;
       padding: 0;
-      background-color: #0f172a;
+      background-color: #0b1120;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       color: #e2e8f0;
     }
     .wrapper {
       width: 100%;
-      background-color: #0f172a;
-      padding: 30px 15px;
+      background-color: #0b1120;
+      padding: 32px 16px;
       box-sizing: border-box;
     }
     .container {
-      max-width: 580px;
+      max-width: 600px;
       margin: 0 auto;
       background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
       border: 1px solid #334155;
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
     }
     .header {
-      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-      padding: 24px;
+      background: linear-gradient(135deg, #1d4ed8 0%, #0f172a 100%);
+      padding: 26px 24px;
       text-align: center;
       color: #ffffff;
+      border-bottom: 2px solid #3b82f6;
     }
     .header h1 {
       margin: 0;
       font-size: 20px;
       letter-spacing: 0.5px;
-      font-weight: 700;
+      font-weight: 800;
     }
     .header p {
       margin: 6px 0 0 0;
       font-size: 13px;
-      opacity: 0.9;
+      color: #93c5fd;
     }
     .content {
-      padding: 28px 24px;
+      padding: 28px 26px;
     }
     .greeting {
-      font-size: 15px;
-      margin-bottom: 16px;
-      color: #f1f5f9;
+      font-size: 16px;
+      margin-bottom: 14px;
+      color: #f8fafc;
     }
-    .notice {
-      font-size: 14px;
-      line-height: 1.5;
-      color: #94a3b8;
-      margin-bottom: 20px;
+    .company-notice {
+      background-color: #0f172a;
+      border-left: 4px solid #3b82f6;
+      border-radius: 6px;
+      padding: 14px 16px;
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: #cbd5e1;
+      margin-bottom: 22px;
     }
-    .doc-card {
+    .resource-card {
       background-color: #1e293b;
       border: 1px solid #334155;
-      border-left: 4px solid #3b82f6;
       border-radius: 8px;
       padding: 14px 18px;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
-    .doc-title {
+    .resource-title {
       font-size: 15px;
       font-weight: 700;
       color: #38bdf8;
-      margin: 0 0 6px 0;
+      margin: 0 0 4px 0;
     }
-    .doc-meta {
+    .resource-meta {
       font-size: 12px;
       color: #94a3b8;
       margin: 0;
     }
-    .otp-card {
-      background: linear-gradient(135deg, #1e1b4b 0%, #172554 100%);
-      border: 1px dashed #60a5fa;
-      border-radius: 10px;
-      padding: 20px;
+    .otp-container {
+      background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+      border: 2px dashed #38bdf8;
+      border-radius: 12px;
+      padding: 24px 20px;
       text-align: center;
       margin: 24px 0;
     }
-    .otp-label {
+    .otp-heading {
       font-size: 12px;
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      letter-spacing: 2px;
       color: #93c5fd;
-      font-weight: 600;
-      margin-bottom: 8px;
+      font-weight: 700;
+      margin-bottom: 10px;
     }
-    .otp-code {
-      font-size: 34px;
+    .otp-value {
+      font-size: 38px;
       font-weight: 800;
-      letter-spacing: 8px;
+      letter-spacing: 10px;
       color: #ffffff;
       font-family: 'Courier New', Courier, monospace;
-      padding: 6px 0;
+      padding: 4px 0;
+      text-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
     }
-    .otp-expiry {
+    .otp-timer {
       font-size: 12px;
-      color: #f59e0b;
-      margin-top: 8px;
-      font-weight: 500;
+      color: #fbbf24;
+      margin-top: 10px;
+      font-weight: 600;
     }
-    .meta-table {
+    .audit-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 20px;
-      font-size: 12px;
+      margin-top: 22px;
+      font-size: 12.5px;
+      background-color: #0f172a;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #334155;
     }
-    .meta-table td {
-      padding: 6px 8px;
+    .audit-table td {
+      padding: 8px 12px;
       color: #94a3b8;
       border-bottom: 1px solid #1e293b;
     }
-    .meta-table td.label {
+    .audit-table td.col-label {
       font-weight: 600;
       color: #cbd5e1;
-      width: 35%;
+      width: 38%;
     }
-    .security-warning {
+    .security-notice {
       background-color: #291515;
-      border: 1px solid #7f1d1d;
+      border: 1px solid #991b1b;
       border-radius: 8px;
       padding: 12px 16px;
       font-size: 12px;
       color: #fca5a5;
-      margin-top: 24px;
-      line-height: 1.4;
+      margin-top: 22px;
+      line-height: 1.45;
     }
     .footer {
       background-color: #0b1120;
-      padding: 16px 24px;
+      padding: 18px 24px;
       text-align: center;
-      font-size: 11px;
+      font-size: 11.5px;
       color: #64748b;
       border-top: 1px solid #1e293b;
+      line-height: 1.4;
     }
   </style>
 </head>
@@ -308,57 +277,59 @@ const buildDocumentOtpHtml = ({ user, resource, otp, deviceInfo = {}, locationIn
   <div class="wrapper">
     <div class="container">
       <div class="header">
-        <h1>🛡️ CloudShield Zero Trust Defense</h1>
-        <p>Document Access Verification (MFA Challenge)</p>
+        <h1>🛡️ CloudShield Enterprise Zero Trust</h1>
+        <p>Official Employee Access Verification</p>
       </div>
       <div class="content">
-        <div class="greeting">Hello, <strong>${userName}</strong>,</div>
-        <p class="notice">
-          A request was initiated to access a secured document on the CloudShield platform. 
-          Use the one-time password (OTP) below to authenticate your identity and unlock document access.
-        </p>
-
-        <div class="doc-card">
-          <div class="doc-title">📄 ${resourceName}</div>
-          <p class="doc-meta">Category: <b>${category}</b> • Classification: <b>${sensitivity}</b></p>
+        <div class="greeting">Hello <strong>${userName}</strong>,</div>
+        
+        <div class="company-notice">
+          <strong>🏢 Company Security Advisory:</strong> An access request has been initiated for your user account (<b>${userEmail}</b>). 
+          Under corporate Zero-Trust compliance guidelines, please enter the one-time authentication code below into your active session to verify your identity.
         </div>
 
-        <div class="otp-card">
-          <div class="otp-label">Your Document Access Verification Code</div>
-          <div class="otp-code">${otp}</div>
-          <div class="otp-expiry">⏱️ Valid for 10 minutes (Single use only)</div>
+        <div class="resource-card">
+          <div class="resource-title">📂 ${resourceName}</div>
+          <p class="resource-meta">Asset Classification: <b>${sensitivity}</b> • Category: <b>${category}</b></p>
         </div>
 
-        <table class="meta-table">
+        <div class="otp-container">
+          <div class="otp-heading">Your Enterprise Verification Passcode</div>
+          <div class="otp-value">${otp}</div>
+          <div class="otp-timer">⏱️ Code valid for 10 minutes (Single use only)</div>
+        </div>
+
+        <table class="audit-table">
           <tr>
-            <td class="label">Target Email:</td>
-            <td>${userEmail}</td>
+            <td class="col-label">Recipient Account:</td>
+            <td><strong>${userEmail}</strong></td>
           </tr>
           <tr>
-            <td class="label">Requested At:</td>
+            <td class="col-label">Security Timestamp:</td>
             <td>${timestamp}</td>
           </tr>
           <tr>
-            <td class="label">IP Address:</td>
+            <td class="col-label">Originating IP:</td>
             <td>${ip}</td>
           </tr>
           <tr>
-            <td class="label">Location:</td>
+            <td class="col-label">Location:</td>
             <td>${location}</td>
           </tr>
           <tr>
-            <td class="label">Device:</td>
+            <td class="col-label">Device Client:</td>
             <td>${device}</td>
           </tr>
         </table>
 
-        <div class="security-warning">
-          <strong>⚠️ Security Advisory:</strong> Never share this OTP with anyone, including IT support. 
-          If you did not make this request, your credentials may be compromised. Please notify your Security Operations Team immediately.
+        <div class="security-notice">
+          <strong>⚠️ Confidentiality Notice:</strong> Do not disclose or forward this verification code to anyone, including internal IT staff. 
+          If you did not initiate this authorization request, report this immediately to the IT Security & Operations Center.
         </div>
       </div>
       <div class="footer">
-        CloudShield Zero-Trust Access Gateway • Continuous Verification Architecture
+        © CloudShield Enterprise Security Gateway • Automated Security Notification<br>
+        This email was dispatched to <b>${userEmail}</b>. Please do not reply directly to this automated email.
       </div>
     </div>
   </div>
@@ -369,31 +340,38 @@ const buildDocumentOtpHtml = ({ user, resource, otp, deviceInfo = {}, locationIn
 
 const emailService = {
   /**
-   * Sends 6-digit MFA OTP email to the user's registered email address for document access.
-   * Priority: Resend HTTPS API (Port 443) -> Nodemailer SMTP Fallback.
+   * Sends 6-digit MFA OTP email exclusively to the user's account for document/resource access.
+   * Sender: Admin account (EMAIL_USER)
+   * Recipient: ONLY the user's account (user.email)
    */
   sendDocumentAccessOtp: async ({ user, resource, otp, deviceInfo = {}, locationInfo = {} }) => {
-    let recipientEmail = user.email;
-    if (
-      (user.email.endsWith('@company.com') || user.email.endsWith('@example.com')) &&
-      process.env.EMAIL_USER &&
-      process.env.EMAIL_USER.includes('@')
-    ) {
-      recipientEmail = process.env.EMAIL_USER;
-      logger.info(`EmailService: Demo account ${user.email} detected -> Delivering real OTP email to configured inbox: ${recipientEmail}`);
+    // Strictly target ONLY the user's account email address
+    const recipientEmail = (user?.email || '').trim();
+
+    if (!recipientEmail || !recipientEmail.includes('@')) {
+      logger.error(`EmailService: Invalid recipient email address: ${recipientEmail}`);
+      return { success: false, error: 'Invalid user email address' };
     }
 
-    const subject = `🔐 CloudShield Security OTP: ${otp} - Document Access (${resource?.name || 'Document'})`;
-    const html = buildDocumentOtpHtml({ user: { ...user, email: recipientEmail }, resource, otp, deviceInfo, locationInfo });
-    const text = `CloudShield Document Access OTP: ${otp}\n\nYou have requested access to "${resource?.name || 'Protected Document'}".\nThis OTP is valid for 10 minutes.\n\nTarget Email: ${recipientEmail}\nIf you did not request this, please contact your security administrator.`;
+    const subject = `🔐 CloudShield Security OTP: ${otp} - Accessing ${resource?.name || 'Document'}`;
+    const html = buildCorporateOtpHtml({
+      user,
+      resource,
+      otp,
+      title: resource?.name,
+      description: 'Document Access Verification',
+      deviceInfo,
+      locationInfo,
+    });
+    const text = `CloudShield Enterprise Verification OTP: ${otp}\n\nHello ${user?.fullName || 'User'},\n\nA request was initiated to access "${resource?.name || 'Corporate Document'}".\nYour verification code is: ${otp}\n\nThis OTP was dispatched to your account: ${recipientEmail}\nValid for 10 minutes.`;
 
-    // 1. Primary Dispatch: Send from Admin Account via Gmail SMTP
+    // 1. Primary Dispatch: Send from Admin Gmail account to User's email
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       try {
         const activeTransporter = await getTransporter();
-        const fromAddress = process.env.SMTP_FROM || `"CloudShield Admin" <${process.env.EMAIL_USER.trim()}>`;
+        const fromAddress = process.env.SMTP_FROM || `"CloudShield Security" <${process.env.EMAIL_USER.trim()}>`;
 
-        logger.info(`EmailService: Sending OTP from Admin account (${process.env.EMAIL_USER}) to user (${recipientEmail})...`);
+        logger.info(`EmailService: Dispatching document access OTP from Admin (${process.env.EMAIL_USER}) exclusively to user (${recipientEmail})...`);
 
         const info = await activeTransporter.sendMail({
           from: fromAddress,
@@ -403,14 +381,14 @@ const emailService = {
           html,
         });
 
-        logger.info(`EmailService: Successfully dispatched document access OTP from Admin to ${recipientEmail} (Message ID: ${info.messageId})`);
+        logger.info(`EmailService: Successfully delivered document OTP to user ${recipientEmail} (Message ID: ${info.messageId})`);
         return { success: true, messageId: info.messageId, provider: 'Admin Gmail SMTP' };
       } catch (smtpErr) {
-        logger.warn(`EmailService: Gmail SMTP dispatch failed (${smtpErr.message}). Attempting Resend HTTPS API failover...`);
+        logger.warn(`EmailService: Gmail SMTP dispatch to ${recipientEmail} failed (${smtpErr.message}). Attempting Resend HTTPS API...`);
       }
     }
 
-    // 2. Secondary Failover Dispatch: Resend HTTPS REST API (Port 443 - 100% Cloud compatible)
+    // 2. Secondary Dispatch: Resend HTTPS REST API (Port 443)
     if (process.env.RESEND_API_KEY) {
       const resendResult = await sendViaResendApi({ to: recipientEmail, subject, html, text });
       if (resendResult?.success) {
@@ -418,40 +396,41 @@ const emailService = {
       }
     }
 
-    logger.warn(`EmailService: Unable to deliver OTP to ${recipientEmail}. Please check EMAIL_USER/EMAIL_PASS or RESEND_API_KEY.`);
+    logger.warn(`EmailService: Could not dispatch OTP to ${recipientEmail}. Please verify SMTP credentials or Resend API key.`);
     return { success: false, error: 'Email delivery failed' };
   },
 
   /**
-   * Sends 6-digit MFA OTP email for Account MFA Setup or Login Challenge.
-   * Sends from Admin Account directly to User Account.
+   * Sends 6-digit MFA OTP email exclusively to the user's account for login/session MFA verification.
+   * Sender: Admin account (EMAIL_USER)
+   * Recipient: ONLY the user's account (user.email)
    */
   sendMfaSecurityOtp: async ({ user, otp, title = 'Security Verification', description = 'Account Authentication Challenge' }) => {
-    let recipientEmail = user.email;
-    if (
-      (user.email.endsWith('@company.com') || user.email.endsWith('@example.com')) &&
-      process.env.EMAIL_USER &&
-      process.env.EMAIL_USER.includes('@')
-    ) {
-      recipientEmail = process.env.EMAIL_USER;
-      logger.info(`EmailService: Demo account ${user.email} detected -> Delivering real OTP email to configured inbox: ${recipientEmail}`);
+    // Strictly target ONLY the user's account email address
+    const recipientEmail = (user?.email || '').trim();
+
+    if (!recipientEmail || !recipientEmail.includes('@')) {
+      logger.error(`EmailService: Invalid recipient email address: ${recipientEmail}`);
+      return { success: false, error: 'Invalid user email address' };
     }
 
-    const subject = `🔐 CloudShield MFA Code: ${otp} - ${title}`;
-    const text = `CloudShield Security Verification OTP: ${otp}\n\n${description}\nThis code is valid for 10 minutes.\n\nTarget Email: ${recipientEmail}`;
-    const html = buildDocumentOtpHtml({
-      user: { ...user, email: recipientEmail },
-      resource: { name: title, category: 'Account Security', sensitivity: 'Critical' },
+    const subject = `🔐 CloudShield Security Passcode: ${otp} - ${title}`;
+    const html = buildCorporateOtpHtml({
+      user,
+      resource: { name: title, category: 'Account Security', sensitivity: 'High' },
       otp,
+      title,
+      description,
     });
+    const text = `CloudShield Enterprise Security Passcode: ${otp}\n\nHello ${user?.fullName || 'User'},\n\nAn identity challenge was triggered for your user account (${recipientEmail}).\nYour 6-digit verification passcode is: ${otp}\n\nValid for 10 minutes.`;
 
-    // 1. Primary Dispatch: Send from Admin Account via Gmail SMTP
+    // 1. Primary Dispatch: Send from Admin Gmail account to User's email
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       try {
         const activeTransporter = await getTransporter();
-        const fromAddress = process.env.SMTP_FROM || `"CloudShield Admin" <${process.env.EMAIL_USER.trim()}>`;
+        const fromAddress = process.env.SMTP_FROM || `"CloudShield Security" <${process.env.EMAIL_USER.trim()}>`;
 
-        logger.info(`EmailService: Sending MFA OTP from Admin account (${process.env.EMAIL_USER}) to user (${recipientEmail})...`);
+        logger.info(`EmailService: Dispatching MFA OTP from Admin (${process.env.EMAIL_USER}) exclusively to user (${recipientEmail})...`);
 
         const info = await activeTransporter.sendMail({
           from: fromAddress,
@@ -461,14 +440,14 @@ const emailService = {
           html,
         });
 
-        logger.info(`EmailService: Successfully dispatched MFA Security OTP from Admin to ${recipientEmail} (Message ID: ${info.messageId})`);
+        logger.info(`EmailService: Successfully delivered MFA OTP to user ${recipientEmail} (Message ID: ${info.messageId})`);
         return { success: true, messageId: info.messageId, provider: 'Admin Gmail SMTP' };
       } catch (smtpErr) {
-        logger.warn(`EmailService: Gmail SMTP dispatch failed (${smtpErr.message}). Attempting Resend HTTPS API failover...`);
+        logger.warn(`EmailService: Gmail SMTP dispatch to ${recipientEmail} failed (${smtpErr.message}). Attempting Resend HTTPS API...`);
       }
     }
 
-    // 2. Secondary Failover Dispatch: Resend HTTPS REST API (Port 443)
+    // 2. Secondary Dispatch: Resend HTTPS REST API (Port 443)
     if (process.env.RESEND_API_KEY) {
       const resendResult = await sendViaResendApi({ to: recipientEmail, subject, html, text });
       if (resendResult?.success) {
@@ -476,7 +455,7 @@ const emailService = {
       }
     }
 
-    logger.warn(`EmailService: Unable to deliver MFA OTP to ${recipientEmail}. Please check EMAIL_USER/EMAIL_PASS or RESEND_API_KEY.`);
+    logger.warn(`EmailService: Could not dispatch MFA OTP to ${recipientEmail}. Please verify SMTP credentials or Resend API key.`);
     return { success: false, error: 'Email delivery failed' };
   },
 };
