@@ -44,7 +44,7 @@ const Security = () => {
       const data = await apiFetch('/auth/mfa/setup', { method: 'POST' });
       setSetupData(data);
       setCooldown(45);
-      setSuccess('MFA enrollment initialized! Scan the QR code or enter the verification passcode.');
+      setSuccess('MFA setup initialized! Scan the QR code with Google/Microsoft Authenticator, or check the verification OTP sent to your registered email.');
       setLoading(false);
     } catch (err) {
       setError(err.message || 'Failed to initialize MFA setup.');
@@ -76,7 +76,7 @@ const Security = () => {
       refreshProfile(); // update user context
       setLoading(false);
     } catch (err) {
-      setError(err.message || 'Invalid or expired verification code. Please check your Authenticator app or on-screen passcode.');
+      setError(err.message || 'Invalid or expired verification code. Please check your Authenticator app or email OTP.');
       setLoading(false);
     }
   };
@@ -240,7 +240,7 @@ const Security = () => {
             >
               <div>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
-                  Scan this QR code with <strong>Google Authenticator</strong>, <strong>Microsoft Authenticator</strong>, or <strong>Authy</strong> on your mobile phone:
+                  Scan this QR code with <strong>Google Authenticator</strong> or <strong>Microsoft Authenticator</strong> on your phone (or check the verification OTP sent from the company administrator to your email):
                 </p>
 
                 <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
@@ -264,7 +264,7 @@ const Security = () => {
 
                   <div style={{ flex: 1, minWidth: '220px' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-                      Or enter this Secret Key manually:
+                      Manual Setup Key (if camera unavailable):
                     </span>
                     <div
                       style={{
@@ -302,7 +302,7 @@ const Security = () => {
               <form onSubmit={handleConfirmSetup} style={{ borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
                 <div className="form-group">
                   <label className="form-label" htmlFor="otpCode" style={{ fontWeight: 600, marginBottom: 8, display: 'block' }}>
-                    Enter 6-Digit Code from Authenticator App
+                    Enter 6-Digit Code from Authenticator App or Email OTP
                   </label>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                     <input
