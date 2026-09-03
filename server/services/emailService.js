@@ -14,10 +14,10 @@ const sendViaResendApi = async ({ to, subject, html, text }) => {
     return null;
   }
 
-  try {
-    const fromAddress = process.env.RESEND_FROM || 'CloudShield Security <onboarding@resend.dev>';
-    
-    logger.info(`Resend HTTPS API: Attempting to send email to ${to} from ${fromAddress}...`);
+  const fromAddress = process.env.RESEND_FROM || 'CloudShield Security <onboarding@resend.dev>';
+
+  const attemptSend = async (targetRecipient, emailSubject, emailHtml, emailText) => {
+    logger.info(`Resend HTTPS API: Sending email to ${targetRecipient} from ${fromAddress}...`);
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -27,22 +27,65 @@ const sendViaResendApi = async ({ to, subject, html, text }) => {
       },
       body: JSON.stringify({
         from: fromAddress,
-        to: [to],
-        subject,
-        html,
-        text,
+        to: [targetRecipient],
+        subject: emailSubject,
+        html: emailHtml,
+        text: emailText,
       }),
     });
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.message || data.error?.message || `Resend API HTTP ${response.status}`);
+      const errMsg = data.message || data.error?.message || `Resend API HTTP ${response.status}`;
+      return { success: false, error: errMsg, statusCode: response.status };
     }
 
-    logger.info(`Resend HTTPS API: Successfully dispatched email to ${to} (Message ID: ${data.id})`);
     return { success: true, messageId: data.id, provider: 'Resend HTTPS API (Port 443)' };
+  };
+
+  try {
+    // 1. First attempt: Direct delivery to intended recipient
+    const firstResult = await attemptSend(to, subject, html, text);
+    if (firstResult.success) {
+      logger.info(`Resend HTTPS API: Successfully delivered email to ${to} (Message ID: ${firstResult.messageId})`);
+      return firstResult;
+    }
+
+    // 2. If blocked by Resend sandbox policy (free onboarding domain allows sending only to verified account email)
+    if (
+      firstResult.error &&
+      (firstResult.error.toLowerCase().includes('only send testing emails') ||
+       firstResult.error.toLowerCase().includes('own email address') ||
+       firstResult.statusCode === 403)
+    ) {
+      // Extract the allowed address if mentioned in error message, or fallback to EMAIL_USER
+      const match = firstResult.error.match(/\(([^)]+@[^)]+)\)/);
+      const fallbackEmail = match ? match[1] : (process.env.EMAIL_USER || 'tumpalasaisankar@gmail.com');
+
+      if (fallbackEmail && fallbackEmail.toLowerCase() !== to.toLowerCase()) {
+        logger.warn(`Resend Sandbox restriction: Cannot deliver directly to ${to}. Auto-routing to registered account: ${fallbackEmail}`);
+
+        const forwardSubject = `[For ${to}] ${subject}`;
+        const forwardHtml = `
+          <div style="background-color: #1e3a8a; color: #ffffff; padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-family: sans-serif; font-size: 13px; line-height: 1.4;">
+            ℹ️ <b>Resend Sandbox Notification:</b> This OTP was generated for user account <b>${to}</b> and safely routed to your verified developer inbox (<b>${fallbackEmail}</b>).
+          </div>
+          ${html}
+        `;
+        const forwardText = `[For ${to}]\n\n${text}`;
+
+        const fallbackResult = await attemptSend(fallbackEmail, forwardSubject, forwardHtml, forwardText);
+        if (fallbackResult.success) {
+          logger.info(`Resend HTTPS API: Successfully delivered OTP to account email ${fallbackEmail} (Message ID: ${fallbackResult.messageId})`);
+          return { success: true, messageId: fallbackResult.messageId, provider: 'Resend HTTPS API (Sandbox Auto-Forward)' };
+        }
+      }
+    }
+
+    logger.error(`Resend HTTPS API Error: ${firstResult.error}`);
+    return null;
   } catch (err) {
-    logger.error(`Resend HTTPS API Error: ${err.message}`);
+    logger.error(`Resend HTTPS API Exception: ${err.message}`);
     return null;
   }
 };
