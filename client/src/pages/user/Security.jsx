@@ -182,20 +182,21 @@ const Security = () => {
               display: 'flex',
               alignItems: 'center',
               gap: 16,
-              padding: '16px',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              backgroundColor: user.security?.mfaEnabled ? '#f0fdf4' : '#fff5f5',
+              padding: '16px 20px',
+              border: `1px solid ${user.security?.mfaEnabled ? 'var(--success-border)' : 'var(--danger-border)'}`,
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: user.security?.mfaEnabled ? 'var(--success-bg)' : 'var(--danger-bg)',
               marginBottom: 24,
             }}
           >
             <div
               style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '50%',
-                backgroundColor: user.security?.mfaEnabled ? 'var(--success-bg)' : 'var(--danger-bg)',
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                backgroundColor: user.security?.mfaEnabled ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
                 color: user.security?.mfaEnabled ? 'var(--success)' : 'var(--danger)',
+                border: `1px solid ${user.security?.mfaEnabled ? 'var(--success-border)' : 'var(--danger-border)'}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -205,10 +206,18 @@ const Security = () => {
               {user.security?.mfaEnabled ? <ShieldCheck size={22} /> : <ShieldAlert size={22} />}
             </div>
             <div>
-              <span style={{ fontWeight: 700, fontSize: '0.95rem', display: 'block' }}>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: '0.975rem',
+                  display: 'block',
+                  color: user.security?.mfaEnabled ? 'var(--success-text)' : 'var(--danger-text)',
+                  marginBottom: 4,
+                }}
+              >
                 MFA Status: {user.security?.mfaEnabled ? 'ENABLED & ACTIVE' : 'DISABLED'}
               </span>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '0.825rem', color: 'var(--text-muted)', lineHeight: 1.4, display: 'block' }}>
                 {user.security?.mfaEnabled
                   ? 'Your account is secured with Zero-Trust Multi-Factor Authentication (Authenticator App & On-Screen Passcodes) on every login and confidential resource access.'
                   : 'Your account is currently without MFA. Enroll below to secure your access.'}
@@ -218,11 +227,16 @@ const Security = () => {
 
           {/* MFA Enrollment Button */}
           {!user.security?.mfaEnabled && !setupData && (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{ textAlign: 'center', padding: '16px 0' }}>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 20 }}>
                 Enrolling in MFA protects your sessions using Google Authenticator, Microsoft Authenticator, or Zero-Trust instant verification passcodes.
               </p>
-              <button onClick={handleStartSetup} className="btn btn-primary" disabled={loading}>
+              <button
+                onClick={handleStartSetup}
+                className="btn btn-primary"
+                disabled={loading}
+                style={{ padding: '10px 24px', fontSize: '0.9rem', borderRadius: 'var(--radius-sm)' }}
+              >
                 {loading ? 'Initializing MFA Setup...' : 'Enroll in Multi-Factor Authentication'}
               </button>
             </div>

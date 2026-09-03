@@ -88,17 +88,52 @@ const Profile = () => {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {user.activeSessions && user.activeSessions.map((session, idx) => (
-                <div key={idx} style={{ display: 'flex', justifyItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid var(--border-color)', borderRadius: '8px', backgroundColor: session.current ? '#f0fdf4' : '#fff' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Laptop size={18} style={{ color: session.current ? 'var(--success)' : 'var(--text-muted)' }} />
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '14px 18px',
+                    border: `1px solid ${session.current ? 'var(--success-border)' : 'var(--border-color)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: session.current ? 'var(--success-bg)' : 'var(--bg-card-subtle)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div
+                      style={{
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '10px',
+                        backgroundColor: session.current ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-card)',
+                        border: `1px solid ${session.current ? 'var(--success-border)' : 'var(--border-color)'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: session.current ? 'var(--success)' : 'var(--text-muted)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Laptop size={18} />
+                    </div>
                     <div>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block' }}>{session.device}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>IP: {session.ip} • Location: {session.location}</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600, display: 'block', color: 'var(--text-primary)', marginBottom: 2 }}>
+                        {session.device}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        IP: {session.ip} • Location: {session.location}
+                      </span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {session.current && <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Current Session</span>}
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    {session.current && (
+                      <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>
+                        Current Session
+                      </span>
+                    )}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       Active: {new Date(session.lastActiveAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
@@ -119,12 +154,42 @@ const Profile = () => {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {user.trustedDevices && user.trustedDevices.map((device, idx) => (
-                <div key={idx} style={{ display: 'flex', justifyItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Smartphone size={18} style={{ color: device.isTrusted ? 'var(--success)' : 'var(--warning)' }} />
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '14px 18px',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--bg-card-subtle)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div
+                      style={{
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '10px',
+                        backgroundColor: device.isTrusted ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: device.isTrusted ? 'var(--success)' : 'var(--warning)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Smartphone size={18} />
+                    </div>
                     <div>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block' }}>{device.deviceName}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Location: {device.location} • Last Seen: {new Date(device.lastUsedAt).toLocaleDateString()}</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600, display: 'block', color: 'var(--text-primary)', marginBottom: 2 }}>
+                        {device.deviceName}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Location: {device.location} • Last Seen: {new Date(device.lastUsedAt).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
                   <div>
