@@ -18,6 +18,7 @@ router.post('/verify-mfa', protect, verifyMfa);
 router.get('/profile', protect, getUserProfile);
 router.post('/mfa/setup', protect, setupMfa);
 router.post('/mfa/confirm', protect, confirmMfa);
+router.post('/mfa/verify', protect, confirmMfa);
 router.post('/mfa/disable', protect, disableMfa);
 router.put('/preferences', protect, updatePreferences);
 

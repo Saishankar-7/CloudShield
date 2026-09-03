@@ -142,6 +142,19 @@ const AccessRequests = () => {
                         </button>
                       </div>
                     )}
+                    {req.status === 'Approved' && (
+                      <div className="action-btn-group" style={{ marginLeft: 6 }}>
+                        <button
+                          onClick={() => handleReviewAction(req, 'Revoked')}
+                          className="action-btn action-btn-danger"
+                          style={{ padding: '4px 8px', fontSize: '0.7rem' }}
+                          title="Revoke Granted Access Immediately"
+                        >
+                          <ThumbsDown size={11} />
+                          <span>Revoke</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>

@@ -11,6 +11,7 @@ const {
   verifyDocumentOtp,
   updateResourceAccess,
   getEmployeeDataRecords,
+  streamResource,
 } = require('../controllers/resourceController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
@@ -22,6 +23,9 @@ router.get('/', protect, getResources);
 
 // Synthetic Employee Records for Decrypted HR Database Viewer
 router.get('/employee-data/records', protect, getEmployeeDataRecords);
+
+// Stream or Download Decrypted Document (PDF / Cloudinary / Local Vault)
+router.get('/:id/stream', protect, streamResource);
 
 // MFA Challenge for Document Access (sends OTP to user's registered email)
 router.post('/:id/request-otp', protect, requestDocumentOtp);

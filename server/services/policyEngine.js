@@ -7,38 +7,49 @@ const policyEngine = {
    * @returns {Object} { decision: 'Allow' | 'Deny' | 'MFA_Required', reason: string, accessLevel: string }
    */
   evaluatePolicy: ({ user, resource, policy, riskScore, deviceInfo, locationInfo }) => {
-    // 1. If user is an admin, they have global override rights unless risk score is Critical (e.g. >= 81)
-    if (user.role === 'admin') {
-      if (riskScore >= 81) {
-        return {
-          decision: 'MFA_Required',
-          reason: 'Admin access with critical risk level requires verification.',
-          accessLevel: 'Admin'
-        };
-      }
-      return {
-        decision: 'Allow',
-        reason: 'Administrator override',
-        accessLevel: 'Admin'
-      };
+    if (!user) {
+      return { decision: 'Deny', reason: 'Unauthenticated session', accessLevel: 'None' };
     }
 
-    // 2. Resource-Level Access Controls Configured by Administrator
+    // 1. Resource-Level Access Controls Configured by Administrator
     if (resource) {
-      // Check if access has been revoked by admin
-      if (resource.accessStatus === 'Revoked') {
+      // Check if access has been revoked or disabled by admin
+      if (resource.accessStatus === 'Revoked' || resource.accessStatus === 'Disabled') {
         return {
           decision: 'Deny',
-          reason: 'Administrator has revoked access to this resource.',
+          reason: 'Administrator has revoked/disabled access to this resource for all users.',
+          accessLevel: 'None',
+        };
+      }
+
+      if (resource.accessStatus === 'Restricted') {
+        return {
+          decision: 'Deny',
+          reason: 'Resource is restricted by Administrator. Access request approval required.',
           accessLevel: 'None',
         };
       }
 
       // Check if user is explicitly blocked by admin
-      if (resource.blockedUsers && resource.blockedUsers.some((uid) => uid.toString() === user._id.toString())) {
+      if (resource.blockedUsers && resource.blockedUsers.some((uid) => (uid._id || uid).toString() === user._id.toString())) {
         return {
           decision: 'Deny',
-          reason: 'User access has been specifically blocked by an Administrator.',
+          reason: 'User account is specifically blocked by an Administrator.',
+          accessLevel: 'None',
+        };
+      }
+
+      // Check Allowed Specific User Accounts
+      // If admin selected specific allowed users on this resource, ONLY those user accounts can access!
+      const hasSpecificAllowedUsers = resource.allowedUsers && resource.allowedUsers.length > 0;
+      const isUserInAllowedUsersList = hasSpecificAllowedUsers && resource.allowedUsers.some(
+        (uid) => (uid._id || uid).toString() === user._id.toString()
+      );
+
+      if (hasSpecificAllowedUsers && !isUserInAllowedUsersList) {
+        return {
+          decision: 'Deny',
+          reason: 'Access restricted: Your user account is not in the authorized accounts list for this resource. Please submit an access request.',
           accessLevel: 'None',
         };
       }
@@ -52,19 +63,27 @@ const policyEngine = {
         };
       }
 
-      // Check allowed departments configured by admin
-      const deptAllowed =
-        !resource.allowedDepartments ||
-        resource.allowedDepartments.length === 0 ||
-        resource.allowedDepartments.includes('All') ||
-        resource.allowedDepartments.includes(user.department);
+      // Check allowed departments configured by admin (if not explicitly whitelisted via allowedUsers)
+      if (!isUserInAllowedUsersList) {
+        const hasNoDepartmentsAllowed =
+          !resource.allowedDepartments ||
+          resource.allowedDepartments.length === 0 ||
+          resource.allowedDepartments.includes('None');
 
-      if (!deptAllowed) {
-        return {
-          decision: 'Deny',
-          reason: `Access restricted to departments: ${resource.allowedDepartments.join(', ')}.`,
-          accessLevel: 'None',
-        };
+        const deptAllowed =
+          !hasNoDepartmentsAllowed &&
+          (resource.allowedDepartments.includes('All') ||
+           resource.allowedDepartments.includes(user.department));
+
+        if (!deptAllowed) {
+          return {
+            decision: 'Deny',
+            reason: hasNoDepartmentsAllowed
+              ? 'Administrator has disabled direct department access. Please submit an access request.'
+              : `Access restricted to departments: ${resource.allowedDepartments.join(', ')}. Please submit an access request.`,
+            accessLevel: 'None',
+          };
+        }
       }
 
       // Check admin MFA policy rule
@@ -81,6 +100,22 @@ const policyEngine = {
           accessLevel: 'Read Only',
         };
       }
+    }
+
+    // 2. Admin role override for general assets
+    if (user.role === 'admin') {
+      if (riskScore >= 81) {
+        return {
+          decision: 'MFA_Required',
+          reason: 'Admin access with critical risk level requires verification.',
+          accessLevel: 'Admin',
+        };
+      }
+      return {
+        decision: 'Allow',
+        reason: 'Administrator override',
+        accessLevel: 'Admin',
+      };
     }
 
     // 3. Fallback evaluation when no specific rule overrides
@@ -135,8 +170,8 @@ const policyEngine = {
 
     // 5. Check unrecognized device block
     if (conditions.blockUnrecognizedDevices) {
-      const isDeviceTrusted = user.trustedDevices.some(
-        d => d.deviceId === deviceInfo.deviceId && d.isTrusted
+      const isDeviceTrusted = (user.trustedDevices || []).some(
+        d => deviceInfo?.deviceId && d.deviceId === deviceInfo.deviceId && d.isTrusted
       );
       if (!isDeviceTrusted) {
         return {
@@ -150,12 +185,12 @@ const policyEngine = {
     // 6. Check location restriction
     if (conditions.allowedLocations && conditions.allowedLocations.length > 0) {
       const isLocationAllowed = conditions.allowedLocations.some(
-        loc => loc.toLowerCase() === locationInfo.country?.toLowerCase()
+        loc => loc.toLowerCase() === locationInfo?.country?.toLowerCase()
       );
       if (!isLocationAllowed) {
         return {
           decision: 'Deny',
-          reason: `Access blocked from location: ${locationInfo.country}.`,
+          reason: `Access blocked from location: ${locationInfo?.country || 'Unknown'}.`,
           accessLevel: 'None'
         };
       }
@@ -182,7 +217,7 @@ const policyEngine = {
 
     // 8. Check if MFA challenge is triggered by elevated risk
     const mfaRiskThreshold = conditions.mfaRequiredAboveRiskScore ?? 30;
-    if (riskScore >= mfaRiskThreshold) {
+    if (riskScore >= mfaRiskThreshold && resource?.mfaRequirement !== 'Disabled') {
       return {
         decision: 'MFA_Required',
         reason: `Elevated risk score (${riskScore}) requires MFA challenge.`,

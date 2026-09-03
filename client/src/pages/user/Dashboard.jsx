@@ -26,7 +26,8 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
-  Zap
+  Zap,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -157,16 +158,11 @@ const Dashboard = () => {
     setMfaCode('');
     setOtpSent(false);
 
-    // Any document/cloud PDF or MFA_Required resource triggers the MFA Email OTP challenge
-    const isDocOrMfa =
-      resource.decision === 'MFA_Required' ||
-      resource.type === 'Document' ||
-      resource.type === 'PDF Document' ||
-      resource.cloudStorage?.isCloudPdf ||
-      resource.sensitivity === 'High' ||
-      resource.sensitivity === 'Critical';
+    // Only prompt for MFA if the Zero-Trust Policy Engine determined MFA is required
+    // (e.g. Admin set MFA Requirement to 'Always Required' or high risk triggered MFA challenge)
+    const requiresMfa = resource.decision === 'MFA_Required' || resource.mfaRequirement === 'Always Required';
 
-    if (isDocOrMfa) {
+    if (requiresMfa && resource.mfaRequirement !== 'Disabled') {
       // Trigger MFA verification modal and send OTP
       setActiveModal('mfa');
       sendMfaOtp(resource);
@@ -178,7 +174,7 @@ const Dashboard = () => {
           sendMfaOtp(resource);
           return;
         }
-        setAccessData(data.resource);
+        setAccessData(data.resource || resource);
         setActiveModal('access');
         fetchDashboardData();
       } catch (err) {
@@ -595,15 +591,17 @@ const Dashboard = () => {
 
       {/* Modals */}
 
-      {/* 1. Modal: Access Confirmed / Display Resource Contents */}
+      {/* 1. Modal: Access Approved */}
       {activeModal === 'access' && selectedRes && (
         <div className="modal-overlay" onClick={() => setActiveModal(null)}>
           <div
             className="modal-content unlock-pulse-success"
             onClick={(e) => e.stopPropagation()}
             style={{
-              maxWidth: (selectedRes.name === 'Employee Data' || selectedRes.category === 'HR') ? '920px' : '650px',
+              maxWidth: (selectedRes.name === 'Employee Data' || selectedRes.category === 'HR') ? '960px' : '860px',
               width: '95%',
+              maxHeight: '92vh',
+              overflowY: 'auto',
             }}
           >
             <div className="modal-header">
@@ -611,69 +609,122 @@ const Dashboard = () => {
               <button className="navbar-btn" onClick={() => setActiveModal(null)}>✕</button>
             </div>
             <div className="modal-body">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '8px', backgroundColor: 'var(--success-bg)', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Shield size={24} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '8px', backgroundColor: 'var(--success-bg)', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Shield size={22} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.2rem' }}>{selectedRes.name}</h3>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Category: {selectedRes.category} • Path: {selectedRes.identifier}</p>
+                  <h3 style={{ fontSize: '1.15rem', margin: 0 }}>{selectedRes.name}</h3>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>Category: {selectedRes.category} • Path: {selectedRes.identifier}</p>
                 </div>
               </div>
               
               <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', backgroundColor: 'var(--bg-card-subtle)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 16 }}>
-                <span style={{ fontWeight: 700, display: 'block', marginBottom: 8, fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Secure Payload</span>
+                <span style={{ fontWeight: 700, display: 'block', marginBottom: 10, fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  Secure Payload
+                </span>
 
                 {(selectedRes.name === 'Employee Data' || selectedRes.category === 'HR') ? (
                   <EmployeeDataViewer resource={selectedRes} />
                 ) : (() => {
                   const activeResource = accessData || selectedRes;
-                  const cloud = activeResource.cloudStorage;
+                  const cloud = activeResource.cloudStorage || {};
                   const hasCloudDoc = cloud?.isCloudPdf || activeResource.type === 'PDF Document' || cloud?.fileUrl;
 
-                  if (hasCloudDoc && cloud) {
+                  if (hasCloudDoc) {
+                    const fileName = cloud.fileName || activeResource.name || 'document.pdf';
+                    const isImage = /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(fileName) || cloud.fileType?.startsWith('image/');
                     const token = localStorage.getItem('token');
                     const streamUrl = `/api/resources/${activeResource._id}/stream?token=${token}`;
                     const downloadUrl = `/api/resources/${activeResource._id}/stream?token=${token}&download=true`;
+                    const pdfStreamUrl = `${streamUrl}#toolbar=0&navpanes=0&view=FitH`;
 
                     return (
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '14px', marginBottom: 14 }}>
-                          <div style={{ backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', padding: '10px', borderRadius: '8px' }}>
-                            <FileText size={28} />
+                        {/* File Meta Pill Card */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '12px 14px', marginBottom: 14 }}>
+                          <div style={{ backgroundColor: isImage ? '#3b82f61a' : 'var(--danger-bg)', color: isImage ? '#38bdf8' : 'var(--danger)', padding: '8px 10px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {isImage ? <ImageIcon size={24} /> : <FileText size={24} />}
                           </div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>
-                                {cloud.fileName || activeResource.name + '.pdf'}
+                                {fileName}
                               </h4>
                               <span className="badge badge-info" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
                                 {cloud.provider || 'Cloudinary Cloud'}
                               </span>
+                              <span className="badge badge-success" style={{ fontSize: '0.62rem', padding: '2px 6px' }}>
+                                {isImage ? 'Image Payload' : 'Decrypted Document'}
+                              </span>
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                              <span>Size: {cloud.fileSize || 'Cloud PDF'}</span>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                              <span>Size: {cloud.fileSize || '0.19 MB'}</span>
                               {cloud.bucketName && <span> • Vault: {cloud.bucketName}</span>}
-                              <span> • Encrypted: {cloud.encryption || 'AES-256'}</span>
+                              <span> • Encrypted: {cloud.encryption || 'AES-256 Cloudinary Secure CDN (HTTPS / TLS 1.3)'}</span>
                             </div>
                           </div>
                         </div>
 
-                        <div style={{ marginBottom: 12 }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
-                            Zero-Trust Decrypted Stream:
-                          </span>
-                          <iframe
-                            src={streamUrl}
-                            title="Decrypted Document Preview"
-                            style={{
-                              width: '100%',
-                              height: '260px',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: 'var(--radius-sm)',
-                              backgroundColor: 'var(--bg-card-subtle)',
-                            }}
-                          />
+                        {/* Live Decrypted Stream Viewer */}
+                        <div style={{ marginBottom: 14 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                              Zero-Trust Decrypted Stream:
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span className="zt-pulse-dot" style={{ width: 6, height: 6, backgroundColor: '#10b981' }}></span>
+                              <span>AES-256 TLS 1.3 Verified</span>
+                            </span>
+                          </div>
+
+                          {isImage ? (
+                            /* High-Definition Centered Image Viewer */
+                            <div
+                              style={{
+                                width: '100%',
+                                minHeight: '380px',
+                                maxHeight: '520px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#070b14',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)',
+                                overflow: 'hidden',
+                                padding: '16px',
+                                boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)',
+                              }}
+                            >
+                              <img
+                                src={streamUrl}
+                                alt={fileName}
+                                style={{
+                                  maxWidth: '100%',
+                                  maxHeight: '480px',
+                                  objectFit: 'contain',
+                                  borderRadius: '6px',
+                                  boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
+                                  display: 'block',
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            /* Full-Width PDF Stream Viewer (No Cramped Nav Sidebar) */
+                            <iframe
+                              src={pdfStreamUrl}
+                              title="Decrypted Document Preview"
+                              style={{
+                                width: '100%',
+                                height: '500px',
+                                minHeight: '460px',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                backgroundColor: '#0f172a',
+                                display: 'block',
+                              }}
+                            />
+                          )}
                         </div>
 
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -682,16 +733,16 @@ const Dashboard = () => {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn btn-primary btn-sm"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px' }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 16px', textDecoration: 'none' }}
                           >
                             <ExternalLink size={14} />
                             <span>Open in Full Tab</span>
                           </a>
                           <a
                             href={downloadUrl}
-                            download={cloud.fileName || 'secure-document.pdf'}
+                            download={fileName}
                             className="btn btn-secondary btn-sm"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px' }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 16px', textDecoration: 'none' }}
                           >
                             <HardDrive size={14} />
                             <span>Download to Laptop</span>

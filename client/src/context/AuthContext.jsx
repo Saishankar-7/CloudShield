@@ -49,11 +49,14 @@ export const AuthProvider = ({ children }) => {
         // MFA challenge triggered
         setMfaTempData({
           email: data.email,
+          maskedEmail: data.maskedEmail || data.email,
           tempToken: data.tempToken,
+          inAppOtp: data.inAppOtp || null,
+          hasTotp: !!data.hasTotp,
         });
         localStorage.setItem('token', data.tempToken); // temporarily store to authorize verify-mfa request
         setLoading(false);
-        return { mfaRequired: true };
+        return { mfaRequired: true, inAppOtp: data.inAppOtp };
       }
 
       // Normal Login Success

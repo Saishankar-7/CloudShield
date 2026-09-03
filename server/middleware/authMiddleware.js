@@ -9,17 +9,19 @@ const protect = async (req, res, next) => {
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
   ) {
-    try {
-      // Get token from header
-      token = req.headers.authorization.split(' ')[1];
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.query.token || req.query.t) {
+    // Support token query parameter for iframe and media streaming
+    token = req.query.token || req.query.t;
+  }
 
-      // Verify token
+  if (token) {
+    try {
       const decoded = jwt.verify(
         token,
         process.env.JWT_SECRET || 'cloudshield_zerotrust_secret_key_987654321'
       );
 
-      // Get user from the token, omitting the password
       req.user = await User.findById(decoded.id);
       if (!req.user) {
         return res.status(401).json({ message: 'User not found in system' });
@@ -29,16 +31,14 @@ const protect = async (req, res, next) => {
         return res.status(403).json({ message: 'Your user account has been blocked by administrators.' });
       }
 
-      next();
+      return next();
     } catch (error) {
       logger.error(`Auth token validation failed: ${error.message}`);
-      res.status(401).json({ message: 'Not authorized, token invalid or expired' });
+      return res.status(401).json({ message: 'Not authorized, token invalid or expired' });
     }
   }
 
-  if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token provided' });
-  }
+  return res.status(401).json({ message: 'Not authorized, no token provided' });
 };
 
 module.exports = { protect };

@@ -58,7 +58,12 @@ const zeroTrustCheck = async (req, res, next) => {
     });
 
     // 4. Override Deny/Blocked decision if the user has an Approved Access Request
-    if (decision === 'Deny' && score < 81) {
+    const isExplicitlyRevokedOrDisabled =
+      resource.accessStatus === 'Revoked' ||
+      resource.accessStatus === 'Disabled' ||
+      (resource.blockedUsers && resource.blockedUsers.some(uid => (uid._id || uid).toString() === user._id.toString()));
+
+    if (decision === 'Deny' && !isExplicitlyRevokedOrDisabled && score < 81) {
       // Check if user has an approved access request for this resource that has not expired
       const AccessRequest = require('../models/AccessRequest');
       const approvedRequest = await AccessRequest.findOne({

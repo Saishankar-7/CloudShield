@@ -16,7 +16,8 @@ const generateRequestId = async () => {
  */
 const createRequest = async (req, res) => {
   try {
-    const { resourceId, accessType, reason } = req.body;
+    const { resourceId, reason } = req.body;
+    const accessType = req.body.accessType || req.body.requestType || 'Read Only';
 
     const resource = await Resource.findById(resourceId).populate('accessPolicy');
     if (!resource) {
@@ -136,8 +137,8 @@ const reviewRequest = async (req, res) => {
   try {
     const { status, reviewNotes, expiryHours = 24 } = req.body;
     
-    if (!['Approved', 'Denied'].includes(status)) {
-      return res.status(400).json({ message: 'Review status must be Approved or Denied.' });
+    if (!['Approved', 'Denied', 'Revoked'].includes(status)) {
+      return res.status(400).json({ message: 'Review status must be Approved, Denied, or Revoked.' });
     }
 
     const request = await AccessRequest.findById(req.params.id)
@@ -148,8 +149,8 @@ const reviewRequest = async (req, res) => {
       return res.status(404).json({ message: 'Access request not found.' });
     }
 
-    if (request.status !== 'Pending') {
-      return res.status(400).json({ message: 'This request has already been reviewed.' });
+    if (request.status === status) {
+      return res.status(400).json({ message: `This request is already marked as ${status}.` });
     }
 
     request.status = status;
@@ -159,6 +160,8 @@ const reviewRequest = async (req, res) => {
 
     if (status === 'Approved') {
       request.accessExpiresOn = new Date(Date.now() + expiryHours * 60 * 60 * 1000);
+    } else {
+      request.accessExpiresOn = new Date();
     }
 
     await request.save();

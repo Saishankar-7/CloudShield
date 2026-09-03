@@ -9,8 +9,9 @@
  * @param {Object} context.locationInfo - Location information parsed from request (country, city)
  * @param {Object} context.policy - Applicable security policy (optional)
  */
-function calculateRisk({ user, resource, deviceInfo, locationInfo, policy }) {
+function calculateRisk({ user, resource, deviceInfo = {}, locationInfo = {}, policy } = {}) {
   let score = 0;
+  if (!user) return { score: 10, riskLevel: 'Low' };
   
   // 1. Resource sensitivity weight
   const sensitivityWeights = {
@@ -25,21 +26,23 @@ function calculateRisk({ user, resource, deviceInfo, locationInfo, policy }) {
   }
   
   // 2. Unrecognized device
-  const isDeviceTrusted = user.trustedDevices.some(
-    d => d.deviceId === deviceInfo.deviceId && d.isTrusted
+  const trustedDevices = user.trustedDevices || [];
+  const isDeviceTrusted = trustedDevices.some(
+    d => deviceInfo?.deviceId && d.deviceId === deviceInfo.deviceId && d.isTrusted
   );
   
-  if (!isDeviceTrusted) {
+  if (!isDeviceTrusted && deviceInfo?.deviceId) {
     const deviceWeight = policy?.riskWeights?.unrecognizedDevice ?? 30;
     score += deviceWeight;
   }
   
   // 3. New/Unusual Location
-  const hasSeenLocation = user.trustedDevices.some(
-    d => d.location && d.location.toLowerCase().includes(locationInfo.country.toLowerCase())
-  ) || (user.lastLoginIp && user.lastLoginIp === deviceInfo.ip);
+  const reqCountry = (locationInfo?.country || 'India').toLowerCase();
+  const hasSeenLocation = trustedDevices.some(
+    d => d.location && d.location.toLowerCase().includes(reqCountry)
+  ) || (user.lastLoginIp && deviceInfo?.ip && user.lastLoginIp === deviceInfo.ip);
   
-  if (!hasSeenLocation && locationInfo.country !== 'India') { // default mock trusted location is India
+  if (!hasSeenLocation && reqCountry !== 'india') { // default mock trusted location is India
     const locationWeight = policy?.riskWeights?.newLocation ?? 25;
     score += locationWeight;
   }
