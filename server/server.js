@@ -9,6 +9,7 @@ dotenv.config();
 
 const User = require('./models/User');
 const { seedDatabase } = require('./seed');
+const { syncEmployeeDataResourceWithCloudinary } = require('./services/employeeDataService');
 
 // Connect to MongoDB and auto-seed if empty
 connectDB().then(async () => {
@@ -20,6 +21,8 @@ connectDB().then(async () => {
     } else {
       logger.info(`Database loaded with ${count} active user records.`);
     }
+    // Ensure Employee Data has Cloudinary PDF attached
+    await syncEmployeeDataResourceWithCloudinary();
   } catch (err) {
     logger.warn(`Database check/seed warning: ${err.message}`);
   }

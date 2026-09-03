@@ -155,7 +155,18 @@ const seedDatabase = async (exitOnComplete = true) => {
       sensitivity: 'High',
       status: 'Protected',
       accessPolicy: hrPolicy._id,
-      description: 'Team directory, employee files, salary logs and contact information.'
+      description: 'Team directory, employee files, salary logs and contact information.',
+      cloudStorage: {
+        isCloudPdf: true,
+        provider: 'Cloudinary Cloud',
+        bucketName: 'dlxueeeau / hr-vault',
+        fileName: 'Enterprise_HR_Employee_Directory_2025.pdf',
+        fileUrl: 'https://res.cloudinary.com/dlxueeeau/raw/upload/v1788411013/cloudshield_hr/Enterprise_HR_Employee_Directory_2025.pdf',
+        fileSize: '1.8 MB',
+        fileType: 'application/pdf',
+        encryption: 'AES-256 Cloudinary Server-Side Encryption',
+        uploadedAt: new Date(),
+      },
     });
     await resEmployeeData.save();
 

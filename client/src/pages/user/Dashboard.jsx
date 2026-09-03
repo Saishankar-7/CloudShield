@@ -5,6 +5,7 @@ import StatCard from '../../components/StatCard';
 import ResourceCard from '../../components/ResourceCard';
 import StatusBadge from '../../components/StatusBadge';
 import BrandLogo from '../../components/BrandLogo';
+import EmployeeDataViewer from '../../components/EmployeeDataViewer';
 import {
   Shield,
   CheckCircle,
@@ -597,7 +598,14 @@ const Dashboard = () => {
       {/* 1. Modal: Access Confirmed / Display Resource Contents */}
       {activeModal === 'access' && selectedRes && (
         <div className="modal-overlay" onClick={() => setActiveModal(null)}>
-          <div className="modal-content unlock-pulse-success" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content unlock-pulse-success"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: (selectedRes.name === 'Employee Data' || selectedRes.category === 'HR') ? '920px' : '650px',
+              width: '95%',
+            }}
+          >
             <div className="modal-header">
               <h2 style={{ fontSize: '1.1rem', color: 'var(--success-text)' }}>✓ Access Approved</h2>
               <button className="navbar-btn" onClick={() => setActiveModal(null)}>✕</button>
@@ -616,8 +624,9 @@ const Dashboard = () => {
               <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', backgroundColor: 'var(--bg-card-subtle)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 16 }}>
                 <span style={{ fontWeight: 700, display: 'block', marginBottom: 8, fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Secure Payload</span>
 
-                {/* Cloud PDF File Display */}
-                {(() => {
+                {(selectedRes.name === 'Employee Data' || selectedRes.category === 'HR') ? (
+                  <EmployeeDataViewer resource={selectedRes} />
+                ) : (() => {
                   const activeResource = accessData || selectedRes;
                   const cloud = activeResource.cloudStorage;
                   const hasCloudDoc = cloud?.isCloudPdf || activeResource.type === 'PDF Document' || cloud?.fileUrl;
@@ -700,13 +709,10 @@ const Dashboard = () => {
                       {selectedRes.name === 'Reports' && (
                         <p>📊 <b>Engineering Metrics Q3:</b> Code delivery velocity increased by 18% following automation pipelines implementation. Zero Trust validation intercepts active on all DB cluster connections.</p>
                       )}
-                      {selectedRes.name === 'Employee Data' && (
-                        <p>👥 <b>Database Records decrypted successfully:</b> Authorized Manager Access. User <b>Sai Kumar</b> belongs to Engineering department. Security risk level score evaluated at 15.</p>
-                      )}
                       {selectedRes.name === 'Dashboard Analytics' && (
                         <p>📈 <b>Analytics Stream:</b> Session success rate is 99.8%. Continuous verification intercepted 1,280 authentication logs this week. High risk warnings decreased by 12%.</p>
                       )}
-                      {!['Documents', 'Reports', 'Employee Data', 'Dashboard Analytics'].includes(selectedRes.name) && (
+                      {!['Documents', 'Reports', 'Dashboard Analytics'].includes(selectedRes.name) && (
                         <p>🔒 <b>Secure Stream Decrypted:</b> Zero Trust verification passed. Session token verified against endpoint <code>{selectedRes.identifier}</code>.</p>
                       )}
                     </>

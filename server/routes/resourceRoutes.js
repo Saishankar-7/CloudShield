@@ -10,6 +10,7 @@ const {
   requestDocumentOtp,
   verifyDocumentOtp,
   updateResourceAccess,
+  getEmployeeDataRecords,
 } = require('../controllers/resourceController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
@@ -18,6 +19,9 @@ const upload = require('../middleware/uploadMiddleware');
 
 // Get all resources evaluated dynamically
 router.get('/', protect, getResources);
+
+// Synthetic Employee Records for Decrypted HR Database Viewer
+router.get('/employee-data/records', protect, getEmployeeDataRecords);
 
 // MFA Challenge for Document Access (sends OTP to user's registered email)
 router.post('/:id/request-otp', protect, requestDocumentOtp);

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiFetch } from '../../services/api';
 import ResourceCard from '../../components/ResourceCard';
 import BrandLogo from '../../components/BrandLogo';
+import EmployeeDataViewer from '../../components/EmployeeDataViewer';
 import {
   FolderLock,
   Shield,
@@ -312,7 +313,14 @@ const MyResources = () => {
       {/* 1. Modal: Access Confirmed */}
       {activeModal === 'access' && selectedRes && (
         <div className="modal-overlay" onClick={() => setActiveModal(null)}>
-          <div className="modal-content unlock-pulse-success" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content unlock-pulse-success"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: (selectedRes.name === 'Employee Data' || selectedRes.category === 'HR') ? '920px' : '650px',
+              width: '95%',
+            }}
+          >
             <div className="modal-header">
               <h2 style={{ fontSize: '1.1rem', color: 'var(--success-text)' }}>✓ Access Granted</h2>
               <button className="navbar-btn" onClick={() => setActiveModal(null)}>✕</button>
@@ -331,8 +339,9 @@ const MyResources = () => {
               <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', backgroundColor: 'var(--bg-card-subtle)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 16 }}>
                 <span style={{ fontWeight: 700, display: 'block', marginBottom: 8, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Secure Payload Contents</span>
 
-                {/* Cloud PDF File Display */}
-                {(selectedRes.cloudStorage?.isCloudPdf || selectedRes.type === 'PDF Document') ? (
+                {(selectedRes.name === 'Employee Data' || selectedRes.category === 'HR') ? (
+                  <EmployeeDataViewer resource={selectedRes} />
+                ) : (selectedRes.cloudStorage?.isCloudPdf || selectedRes.type === 'PDF Document') ? (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '14px', marginBottom: 14 }}>
                       <div style={{ backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', padding: '10px', borderRadius: '8px' }}>
@@ -412,16 +421,13 @@ const MyResources = () => {
                     {selectedRes.name === 'Reports' && (
                       <p>📊 <b>Engineering Metrics Q3:</b> Code delivery velocity increased by 18% following automation pipelines implementation. Zero Trust validation intercepts active on all DB cluster connections.</p>
                     )}
-                    {selectedRes.name === 'Employee Data' && (
-                      <p>👥 <b>Database Records decrypted successfully:</b> Authorized Manager Access. User <b>Sai Kumar</b> belongs to Engineering department. Security risk level score evaluated at 15.</p>
-                    )}
                     {selectedRes.name === 'Dashboard Analytics' && (
                       <p>📈 <b>Analytics Stream:</b> Session success rate is 99.8%. Continuous verification intercepted 1,280 authentication logs this week. High risk warnings decreased by 12%.</p>
                     )}
                     {selectedRes.name === 'Admin Panel' && (
                       <p>💻 <b>Superuser Console Active:</b> System administrative functions unlocked. Firewalls, network clusters, and security policies are active and logging audit traces.</p>
                     )}
-                    {!['Documents', 'Reports', 'Employee Data', 'Dashboard Analytics', 'Admin Panel'].includes(selectedRes.name) && (
+                    {!['Documents', 'Reports', 'Dashboard Analytics', 'Admin Panel'].includes(selectedRes.name) && (
                       <p>🔒 <b>Secure Stream Decrypted:</b> Zero Trust verification passed. Session token verified against endpoint <code>{selectedRes.identifier}</code>.</p>
                     )}
                   </>

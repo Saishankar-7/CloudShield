@@ -580,6 +580,27 @@ const updateResourceAccess = async (req, res) => {
   }
 };
 
+/**
+ * Get Synthetic Employee Records for Decrypted HR Database View
+ */
+const getEmployeeDataRecords = async (req, res) => {
+  try {
+    const { SYNTHETIC_EMPLOYEES } = require('../services/employeeDataService');
+    const resource = await Resource.findOne({ name: 'Employee Data' });
+
+    res.status(200).json({
+      success: true,
+      totalCount: SYNTHETIC_EMPLOYEES.length,
+      employees: SYNTHETIC_EMPLOYEES,
+      documentUrl: resource?.cloudStorage?.fileUrl || 'https://res.cloudinary.com/dlxueeeau/raw/upload/v1788411013/cloudshield_hr/Enterprise_HR_Employee_Directory_2025.pdf',
+      resource,
+    });
+  } catch (error) {
+    logger.error(`getEmployeeDataRecords error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to fetch employee records', error: error.message });
+  }
+};
+
 module.exports = {
   getResources,
   getResourceById,
@@ -590,4 +611,5 @@ module.exports = {
   requestDocumentOtp,
   verifyDocumentOtp,
   updateResourceAccess,
+  getEmployeeDataRecords,
 };
