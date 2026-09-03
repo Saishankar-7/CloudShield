@@ -239,61 +239,49 @@ const Security = () => {
               }}
             >
               <div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
-                  Scan this QR code with <strong>Google Authenticator</strong> or <strong>Microsoft Authenticator</strong> on your phone (or check the verification OTP sent from the company administrator to your email):
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
+                  Scan this QR code with <strong>Google Authenticator</strong> or <strong>Microsoft Authenticator</strong> on your phone (or enter the 6-digit verification OTP sent to your registered email <strong>{user.email}</strong>):
                 </p>
 
-                <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
+                <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
                   {setupData.qrCodeUrl && (
                     <div
                       style={{
                         background: '#ffffff',
-                        padding: '10px',
-                        borderRadius: '8px',
+                        padding: '12px',
+                        borderRadius: '10px',
                         border: '1px solid var(--border-color)',
                         display: 'inline-block',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
                       }}
                     >
                       <img
                         src={setupData.qrCodeUrl}
                         alt="MFA QR Code"
-                        style={{ width: '150px', height: '150px', display: 'block' }}
+                        style={{ width: '160px', height: '160px', display: 'block' }}
                       />
                     </div>
                   )}
 
                   <div style={{ flex: 1, minWidth: '220px' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-                      Manual Setup Key (if camera unavailable):
-                    </span>
                     <div
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
                         background: 'var(--bg-card)',
                         border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        padding: '8px 12px',
-                        marginBottom: 8,
+                        borderRadius: '8px',
+                        padding: '14px 16px',
                       }}
                     >
-                      <code style={{ fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 700, letterSpacing: '1px', flex: 1 }}>
-                        {setupData.formattedSecret || setupData.secret}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={() => handleCopySecret(setupData.secret)}
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '4px 8px', fontSize: '0.7rem' }}
-                        title="Copy Secret"
-                      >
-                        {copied ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
-                      </button>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: 6 }}>
+                        📱 Authenticator App Setup
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+                        Open Google or Microsoft Authenticator, tap add account (+), and point your camera at the QR code.
+                      </p>
+                      <div style={{ fontSize: '0.75rem', color: '#38bdf8' }}>
+                        ✉️ An email OTP has also been sent to: <strong>{user.email}</strong>
+                      </div>
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      Account: <strong>{user.email}</strong> • Issuer: <strong>CloudShield</strong>
-                    </span>
                   </div>
                 </div>
               </div>

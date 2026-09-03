@@ -457,17 +457,20 @@ const confirmMfa = async (req, res) => {
 
     const cleanOtp = rawToken.trim();
 
-    // 1. Check DocumentOtp
+    // 1. Check DocumentOtp (Email OTP for MFA setup or user email)
     const otpRecord = await DocumentOtp.findOne({
-      user: user._id,
-      purpose: 'mfa_setup',
-      verified: false,
+      $or: [
+        { user: user._id, purpose: 'mfa_setup', verified: false },
+        { email: user.email.toLowerCase(), verified: false },
+        { user: user._id, verified: false },
+      ],
+      otp: cleanOtp,
       expiresAt: { $gt: new Date() },
     }).sort({ createdAt: -1 });
 
-    const isEmailOtpValid = otpRecord && otpRecord.otp === cleanOtp;
+    const isEmailOtpValid = !!otpRecord;
 
-    // 2. Check TOTP from Google Authenticator
+    // 2. Check TOTP from Google / Microsoft Authenticator app
     const isTotpValid = user.security?.mfaSecret && mfaService.verifyTotp(user.security.mfaSecret, cleanOtp);
 
     // 3. Testing bypass code
@@ -476,7 +479,7 @@ const confirmMfa = async (req, res) => {
     const isVerified = isEmailOtpValid || isTotpValid || isBypassValid;
 
     if (!isVerified) {
-      return res.status(400).json({ message: 'Verification failed. Invalid code. Check Google Authenticator or the on-screen passcode.' });
+      return res.status(400).json({ message: 'Verification failed. Invalid or expired code. Please enter the 6-digit code from Google Authenticator or your email OTP.' });
     }
 
     if (otpRecord) {

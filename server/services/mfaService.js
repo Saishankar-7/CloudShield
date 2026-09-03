@@ -119,9 +119,9 @@ const mfaService = {
 
     if (!secret) return false;
 
-    // 2. Verify against standard RFC 6238 TOTP (current, -30s, +30s)
+    // 2. Verify against standard RFC 6238 TOTP (expanded ±2 step / 60s window for clock drift tolerance)
     const now = Date.now();
-    for (let step = -1; step <= 1; step++) {
+    for (let step = -2; step <= 2; step++) {
       const expected = generateTotp(secret, 30, now + step * 30000);
       if (expected && expected === cleanToken) {
         logger.info(`MFA verified successfully via standard TOTP (step offset: ${step})`);
