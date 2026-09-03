@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../../services/api';
+import { apiFetch, API_URL } from '../../services/api';
 import ResourceCard from '../../components/ResourceCard';
 import BrandLogo from '../../components/BrandLogo';
 import EmployeeDataViewer from '../../components/EmployeeDataViewer';
@@ -329,8 +329,8 @@ const MyResources = () => {
                       const fileName = cloud.fileName || selectedRes.name || 'document.pdf';
                       const isImage = /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(fileName) || cloud.fileType?.startsWith('image/');
                       const token = localStorage.getItem('token');
-                      const streamUrl = `/api/resources/${selectedRes._id}/stream?token=${token}`;
-                      const downloadUrl = `/api/resources/${selectedRes._id}/stream?token=${token}&download=true`;
+                      const streamUrl = `${API_URL}/resources/${selectedRes._id}/stream?token=${token}`;
+                      const downloadUrl = `${API_URL}/resources/${selectedRes._id}/stream?token=${token}&download=true`;
                       const pdfStreamUrl = `${streamUrl}#toolbar=0&navpanes=0&view=FitH`;
 
                       return (

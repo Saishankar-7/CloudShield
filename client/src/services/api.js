@@ -1,7 +1,8 @@
 const RAW_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const BASE_URL = RAW_API_URL.replace(/\/+$/, '').endsWith('/api')
+export const BASE_URL = RAW_API_URL.replace(/\/+$/, '').endsWith('/api')
   ? RAW_API_URL.replace(/\/+$/, '')
   : `${RAW_API_URL.replace(/\/+$/, '')}/api`;
+export const API_URL = BASE_URL;
 
 /**
  * Enhanced fetch wrapper that injects authentication token

@@ -280,11 +280,11 @@ const uploadCloudDocument = async (req, res) => {
             fileSize: sizeInMb,
             sizeBytes: uploadResult.bytes,
             fileType: file.mimetype || 'application/pdf',
-            fileUrl: localStreamUrl, // Accessible by all browser iframes and viewers
+            fileUrl: uploadResult.secure_url || localStreamUrl,
             cloudinaryUrl: uploadResult.secure_url,
             cloudUri: `cloudinary://${uploadResult.public_id}`,
             provider: 'Cloudinary Cloud',
-            bucketName: process.env.CLOUDINARY_CLOUD_NAME || 'cloudinary-vault',
+            bucketName: process.env.CLOUDINARY_CLOUD_NAME || 'dlxueeeau',
             encryption: 'AES-256 Cloudinary Secure CDN (HTTPS / TLS 1.3)',
             isCloudPdf: isPdf,
           },
@@ -725,12 +725,12 @@ const streamResource = async (req, res) => {
     const disposition = isDownload ? 'attachment' : 'inline';
 
     // 1. Determine target file source
-    let targetUrl = resource.cloudStorage?.fileUrl || resource.cloudStorage?.cloudinaryUrl;
+    let targetUrl = resource.cloudStorage?.cloudinaryUrl || resource.cloudStorage?.fileUrl;
     const cloudUri = resource.cloudStorage?.cloudUri || resource.identifier;
     const storedName = resource.cloudStorage?.storedName || resource.cloudStorage?.fileName;
 
     // If cloudUri is cloudinary://public_id and no valid http URL
-    if ((!targetUrl || !targetUrl.startsWith('http')) && cloudUri && cloudUri.startsWith('cloudinary://')) {
+    if ((!targetUrl || !targetUrl.startsWith('http') || targetUrl.includes('localhost:5000')) && cloudUri && cloudUri.startsWith('cloudinary://')) {
       const publicId = cloudUri.replace('cloudinary://', '');
       const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'dlxueeeau';
       targetUrl = `https://res.cloudinary.com/${cloudName}/raw/upload/${publicId}`;
@@ -739,10 +739,21 @@ const streamResource = async (req, res) => {
     // 2. If it's a local file in uploads folder
     const localUploadsPath = path.join(__dirname, '../uploads');
     let localFilePath = null;
+
     if (storedName) {
       const potentialPath = path.join(localUploadsPath, storedName);
       if (fs.existsSync(potentialPath)) {
         localFilePath = potentialPath;
+      }
+    }
+
+    if (!localFilePath && targetUrl && targetUrl.includes('/uploads/')) {
+      const extractedName = targetUrl.split('/uploads/')[1];
+      if (extractedName) {
+        const potentialPath = path.join(localUploadsPath, extractedName);
+        if (fs.existsSync(potentialPath)) {
+          localFilePath = potentialPath;
+        }
       }
     }
 
@@ -753,7 +764,7 @@ const streamResource = async (req, res) => {
     }
 
     // 3. If targetUrl is an HTTP / HTTPS URL (Cloudinary / CDN / Remote)
-    if (targetUrl && targetUrl.startsWith('http')) {
+    if (targetUrl && targetUrl.startsWith('http') && !targetUrl.includes('localhost:5000')) {
       try {
         const fetchRes = await fetch(targetUrl);
         if (fetchRes.ok) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiFetch, apiUpload } from '../../services/api';
+import { apiFetch, apiUpload, API_URL } from '../../services/api';
 import DataTable from '../../components/DataTable';
 import RiskBadge from '../../components/RiskBadge';
 import BrandLogo from '../../components/BrandLogo';
@@ -911,8 +911,8 @@ const Resources = () => {
 
               {(() => {
                 const token = localStorage.getItem('token');
-                const streamUrl = `/api/resources/${viewingCloudAsset._id}/stream?token=${token}`;
-                const downloadUrl = `/api/resources/${viewingCloudAsset._id}/stream?token=${token}&download=true`;
+                const streamUrl = `${API_URL}/resources/${viewingCloudAsset._id}/stream?token=${token}`;
+                const downloadUrl = `${API_URL}/resources/${viewingCloudAsset._id}/stream?token=${token}&download=true`;
 
                 return (
                   <div>
