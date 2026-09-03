@@ -396,10 +396,7 @@ const requestDocumentOtp = async (req, res) => {
       details: `Document access verification OTP sent to registered email ${user.email} for document "${resource.name}"`,
     });
 
-    const targetEmail =
-      (user.email.endsWith('@company.com') || user.email.endsWith('@example.com')) && process.env.EMAIL_USER
-        ? process.env.EMAIL_USER
-        : user.email;
+    const targetEmail = user.email;
 
     res.status(200).json({
       success: true,
