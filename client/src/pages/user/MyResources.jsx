@@ -107,6 +107,21 @@ const MyResources = () => {
     setAccessData(null);
     setOtpSent(false);
 
+    // Check if user has already verified OTP for this document during this login session
+    let unlocked = [];
+    try {
+      unlocked = JSON.parse(sessionStorage.getItem('unlocked_resources') || '[]');
+    } catch (e) {
+      unlocked = [];
+    }
+
+    if (unlocked.includes(resource._id)) {
+      // Document is already verified and unlocked for this login session
+      setAccessData(resource);
+      setActiveModal('access');
+      return;
+    }
+
     const requiresMfa = resource.decision === 'MFA_Required' || resource.mfaRequirement === 'Always Required';
 
     if (requiresMfa && resource.mfaRequirement !== 'Disabled') {
@@ -173,6 +188,16 @@ const MyResources = () => {
         }
       }
 
+      // Add to session unlocked resources
+      try {
+        const unlocked = JSON.parse(sessionStorage.getItem('unlocked_resources') || '[]');
+        if (!unlocked.includes(selectedRes._id)) {
+          unlocked.push(selectedRes._id);
+          sessionStorage.setItem('unlocked_resources', JSON.stringify(unlocked));
+        }
+      } catch (e) {}
+
+      localStorage.setItem('sim_mfa_verified', 'true');
       setMfaSuccess('Identity verified successfully! Unlocking resource payload...');
       setTimeout(() => {
         setAccessData(resourceResult || selectedRes);

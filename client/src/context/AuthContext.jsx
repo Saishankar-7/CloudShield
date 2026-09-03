@@ -136,6 +136,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('sim_mfa_verified');
+    sessionStorage.removeItem('unlocked_resources');
     setUser(null);
     setToken(null);
     setMfaTempData(null);

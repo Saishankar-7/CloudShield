@@ -161,6 +161,21 @@ const Dashboard = () => {
     setMfaCode('');
     setOtpSent(false);
 
+    // Check if user has already verified OTP for this document during this login session
+    let unlocked = [];
+    try {
+      unlocked = JSON.parse(sessionStorage.getItem('unlocked_resources') || '[]');
+    } catch (e) {
+      unlocked = [];
+    }
+
+    if (unlocked.includes(resource._id)) {
+      // Document is already verified and unlocked for this login session
+      setAccessData(resource);
+      setActiveModal('access');
+      return;
+    }
+
     // Only prompt for MFA if the Zero-Trust Policy Engine determined MFA is required
     // (e.g. Admin set MFA Requirement to 'Always Required' or high risk triggered MFA challenge)
     const requiresMfa = resource.decision === 'MFA_Required' || resource.mfaRequirement === 'Always Required';
@@ -259,10 +274,18 @@ const Dashboard = () => {
         }
       }
 
-      // Set verification flag in session headers
+      // Set verification flag in session headers & unlocked document cache
       localStorage.setItem('sim_mfa_verified', 'true');
+      try {
+        const unlocked = JSON.parse(sessionStorage.getItem('unlocked_resources') || '[]');
+        if (!unlocked.includes(selectedRes._id)) {
+          unlocked.push(selectedRes._id);
+          sessionStorage.setItem('unlocked_resources', JSON.stringify(unlocked));
+        }
+      } catch (e) {}
+
       setSimMfa(true);
-      setAccessData(resourceResult);
+      setAccessData(resourceResult || selectedRes);
       setActiveModal('access');
       setMfaCode('');
       setMfaSuccess('');

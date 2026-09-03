@@ -664,55 +664,66 @@ const streamResource = async (req, res) => {
     // Zero-Trust Authorization & Per-User Approval Verification
     const user = req.user;
     if (user && user.role !== 'admin') {
-      const deviceInfo = {
-        deviceId: req.headers['x-device-id'] || 'device-default-key',
-        deviceName: req.headers['x-device-name'] || req.headers['user-agent'] || 'Browser',
-        ip: req.headers['x-simulated-ip'] || req.ip || '192.168.1.10',
-      };
-      const locationInfo = {
-        country: req.headers['x-location-country'] || 'India',
-        city: req.headers['x-location-city'] || 'Mumbai',
-      };
+      const isExplicitlyRevokedOrDisabled =
+        resource.accessStatus === 'Revoked' ||
+        resource.accessStatus === 'Disabled' ||
+        (resource.blockedUsers && resource.blockedUsers.some(uid => (uid._id || uid).toString() === user._id.toString()));
 
-      const { score } = calculateRisk({
-        user,
-        resource,
-        deviceInfo,
-        locationInfo,
-        policy: resource.accessPolicy,
+      if (isExplicitlyRevokedOrDisabled) {
+        logger.warn(`Unauthorized stream attempt: Resource ${resource.name} is revoked/disabled`);
+        return res.status(403).send('Access Denied: Administrator has disabled access to this resource.');
+      }
+
+      // Check if user has already verified OTP for this document during session
+      const hasVerifiedOtp = await DocumentOtp.findOne({
+        user: user._id,
+        resource: resource._id,
+        verified: true,
+        expiresAt: { $gt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       });
 
-      let { decision } = policyEngine.evaluatePolicy({
-        user,
-        resource,
-        policy: resource.accessPolicy,
-        riskScore: score,
-        deviceInfo,
-        locationInfo,
+      // Check if user has approved access request
+      const approvedReq = await AccessRequest.findOne({
+        user: user._id,
+        resource: resource._id,
+        status: 'Approved',
+        accessExpiresOn: { $gt: new Date() },
       });
 
-      // If policy denies access (e.g. disabled departments), check if THIS particular user was approved
-      if (decision === 'Deny') {
-        const isExplicitlyRevokedOrDisabled =
-          resource.accessStatus === 'Revoked' ||
-          resource.accessStatus === 'Disabled' ||
-          (resource.blockedUsers && resource.blockedUsers.some(uid => (uid._id || uid).toString() === user._id.toString()));
+      // If user has not verified OTP and not approved, check policy
+      if (!hasVerifiedOtp && !approvedReq) {
+        const deviceInfo = {
+          deviceId: req.headers['x-device-id'] || 'device-default-key',
+          deviceName: req.headers['x-device-name'] || req.headers['user-agent'] || 'Authorized Client Device',
+          browser: req.headers['x-device-browser'] || 'Browser',
+          os: req.headers['x-device-os'] || 'OS',
+          ip: req.headers['x-simulated-ip'] || req.ip || '192.168.1.10',
+        };
+        const locationInfo = {
+          country: req.headers['x-location-country'] || 'India',
+          city: req.headers['x-location-city'] || 'Mumbai',
+        };
 
-        if (isExplicitlyRevokedOrDisabled) {
-          logger.warn(`Unauthorized stream attempt: Resource ${resource.name} is revoked/disabled`);
-          return res.status(403).send('Access Denied: Administrator has disabled access to this resource.');
-        }
-
-        const approvedReq = await AccessRequest.findOne({
-          user: user._id,
-          resource: resource._id,
-          status: 'Approved',
-          accessExpiresOn: { $gt: new Date() },
+        const { score } = calculateRisk({
+          user,
+          resource,
+          deviceInfo,
+          locationInfo,
+          policy: resource.accessPolicy,
         });
 
-        if (!approvedReq) {
-          logger.warn(`Unauthorized stream attempt: User ${user.email} (${user._id}) denied for resource ${resource.name}`);
-          return res.status(403).send('Access Denied: You do not have approved authorization to access this resource.');
+        let { decision } = policyEngine.evaluatePolicy({
+          user,
+          resource,
+          policy: resource.accessPolicy,
+          riskScore: score,
+          deviceInfo,
+          locationInfo,
+        });
+
+        if (decision === 'Deny') {
+          logger.warn(`Unauthorized stream attempt: User ${user.email} denied by policy for ${resource.name}`);
+          return res.status(403).send('Access Denied: You do not have authorization to view this document.');
         }
       }
     }
