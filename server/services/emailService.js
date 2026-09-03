@@ -4,55 +4,21 @@ const logger = require('../utils/logger');
 let transporter = null;
 
 /**
- * Dispatches an email via Brevo (formerly Sendinblue) HTTPS REST API (Port 443 - 100% Render compatible).
- * Free tier: 300 emails/day forever to ANY recipient without domain verification.
- */
-const sendViaBrevoApi = async ({ to, subject, html, text }) => {
-  const apiKey = process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.EMAIL_USER || 'security@cloudshield.internal';
-    const senderName = process.env.BREVO_SENDER_NAME || 'CloudShield Security';
-
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': apiKey.trim(),
-        'Content-Type': 'application/json',
-        'accept': 'application/json',
-      },
-      body: JSON.stringify({
-        sender: { name: senderName, email: senderEmail },
-        to: [{ email: to }],
-        subject,
-        htmlContent: html,
-        textContent: text,
-      }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.message || `Brevo HTTP ${response.status}`);
-    }
-
-    logger.info(`Brevo HTTPS API: Dispatched email to ${to} (ID: ${data.messageId})`);
-    return { success: true, messageId: data.messageId, provider: 'Brevo HTTPS REST API (Port 443)' };
-  } catch (err) {
-    logger.error(`Brevo HTTPS API failed: ${err.message}`);
-    return null;
-  }
-};
-
-/**
- * Dispatches an email via Resend HTTPS REST API (Port 443 - 100% Render compatible).
+ * Dispatches an email via Resend HTTPS REST API (Port 443 - 100% Render and Cloud compatible).
+ * Uses process.env.RESEND_API_KEY and process.env.RESEND_FROM (defaults to 'CloudShield Security <onboarding@resend.dev>').
  */
 const sendViaResendApi = async ({ to, subject, html, text }) => {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    logger.warn('EmailService: RESEND_API_KEY is not set in environment variables.');
+    return null;
+  }
 
   try {
-    const fromAddress = process.env.RESEND_FROM || process.env.SMTP_FROM || 'CloudShield Security <onboarding@resend.dev>';
+    const fromAddress = process.env.RESEND_FROM || 'CloudShield Security <onboarding@resend.dev>';
+    
+    logger.info(`Resend HTTPS API: Attempting to send email to ${to} from ${fromAddress}...`);
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -70,58 +36,19 @@ const sendViaResendApi = async ({ to, subject, html, text }) => {
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.message || `Resend API HTTP ${response.status}`);
+      throw new Error(data.message || data.error?.message || `Resend API HTTP ${response.status}`);
     }
 
-    logger.info(`Resend HTTPS API: Dispatched email to ${to} (ID: ${data.id})`);
+    logger.info(`Resend HTTPS API: Successfully dispatched email to ${to} (Message ID: ${data.id})`);
     return { success: true, messageId: data.id, provider: 'Resend HTTPS API (Port 443)' };
   } catch (err) {
-    logger.error(`Resend HTTPS API failed: ${err.message}`);
+    logger.error(`Resend HTTPS API Error: ${err.message}`);
     return null;
   }
 };
 
 /**
- * Dispatches an email via SendGrid HTTPS REST API (Port 443 - 100% Render compatible).
- */
-const sendViaSendGridApi = async ({ to, subject, html, text }) => {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const fromEmail = process.env.SENDGRID_FROM || process.env.EMAIL_USER || 'security@cloudshield.internal';
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey.trim()}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        personalizations: [{ to: [{ email: to }] }],
-        from: { email: fromEmail, name: 'CloudShield Security' },
-        subject,
-        content: [
-          { type: 'text/plain', value: text },
-          { type: 'text/html', value: html },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`SendGrid HTTP ${response.status}: ${errorText}`);
-    }
-
-    logger.info(`SendGrid HTTPS API: Dispatched email to ${to}`);
-    return { success: true, messageId: 'sendgrid-' + Date.now(), provider: 'SendGrid HTTPS API (Port 443)' };
-  } catch (err) {
-    logger.error(`SendGrid HTTPS API failed: ${err.message}`);
-    return null;
-  }
-};
-
-/**
- * Initializes or retrieves the Nodemailer transporter instance with fast timeouts for Render compatibility.
+ * Initializes or retrieves the Nodemailer transporter instance with fast timeouts for fallback compatibility.
  */
 const getTransporter = async () => {
   if (transporter) return transporter;
@@ -148,7 +75,6 @@ const getTransporter = async () => {
     });
     logger.info(`Nodemailer: Connected via Custom SMTP (${smtpHost}) for ${emailUser.trim()}`);
   } else if (emailUser && emailPass) {
-    // Gmail Direct SSL Transport (Port 465) with fast timeout
     const cleanUser = emailUser.trim();
     const cleanPass = emailPass.trim().replace(/\s+/g, '');
     transporter = nodemailer.createTransport({
@@ -168,11 +94,10 @@ const getTransporter = async () => {
     });
     logger.info(`Nodemailer: Connected via Gmail Direct SSL (smtp.gmail.com:465) for ${cleanUser}`);
   } else {
-    // Generate Nodemailer Ethereal SMTP test transporter or simulated fallback
-    logger.warn('Nodemailer: No EMAIL_USER/EMAIL_PASS in .env. Initializing in-app test delivery mode...');
+    logger.warn('Nodemailer: No EMAIL_USER/EMAIL_PASS in .env. Initializing in-app fallback logger...');
     transporter = {
       sendMail: async (mailOptions) => {
-        logger.info(`[CLOUD-SHIELD IN-APP/SIMULATED] To: ${mailOptions.to} | Subject: ${mailOptions.subject}`);
+        logger.info(`[CLOUD-SHIELD FALLBACK LOG] To: ${mailOptions.to} | Subject: ${mailOptions.subject}`);
         return { messageId: 'simulated-' + Date.now(), simulated: true };
       },
     };
@@ -407,6 +332,7 @@ const buildDocumentOtpHtml = ({ user, resource, otp, deviceInfo = {}, locationIn
 const emailService = {
   /**
    * Sends 6-digit MFA OTP email to the user's registered email address for document access.
+   * Priority: Resend HTTPS API (Port 443) -> Nodemailer SMTP Fallback.
    */
   sendDocumentAccessOtp: async ({ user, resource, otp, deviceInfo = {}, locationInfo = {} }) => {
     let recipientEmail = user.email;
@@ -423,15 +349,7 @@ const emailService = {
     const html = buildDocumentOtpHtml({ user: { ...user, email: recipientEmail }, resource, otp, deviceInfo, locationInfo });
     const text = `CloudShield Document Access OTP: ${otp}\n\nYou have requested access to "${resource?.name || 'Protected Document'}".\nThis OTP is valid for 10 minutes.\n\nTarget Email: ${recipientEmail}\nIf you did not request this, please contact your security administrator.`;
 
-    // 1. Try Brevo HTTPS REST API (Port 443 - 300 free emails/day to any address)
-    if (process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY) {
-      const brevoResult = await sendViaBrevoApi({ to: recipientEmail, subject, html, text });
-      if (brevoResult?.success) {
-        return { success: true, messageId: brevoResult.messageId, provider: brevoResult.provider };
-      }
-    }
-
-    // 2. Try Resend HTTPS REST API (Port 443)
+    // 1. Primary Dispatch: Resend HTTPS REST API (Port 443 - 100% Render compatible)
     if (process.env.RESEND_API_KEY) {
       const resendResult = await sendViaResendApi({ to: recipientEmail, subject, html, text });
       if (resendResult?.success) {
@@ -439,15 +357,7 @@ const emailService = {
       }
     }
 
-    // 3. Try SendGrid HTTPS REST API (Port 443)
-    if (process.env.SENDGRID_API_KEY) {
-      const sendgridResult = await sendViaSendGridApi({ to: recipientEmail, subject, html, text });
-      if (sendgridResult?.success) {
-        return { success: true, messageId: sendgridResult.messageId, provider: sendgridResult.provider };
-      }
-    }
-
-    // 4. Try Nodemailer SMTP (with fast timeout)
+    // 2. Secondary Fallback: Nodemailer SMTP
     try {
       const activeTransporter = await getTransporter();
       const fromAddress = process.env.SMTP_FROM || process.env.EMAIL_USER || '"CloudShield Security" <security@cloudshield.internal>';
@@ -462,19 +372,20 @@ const emailService = {
 
       const previewUrl = nodemailer.getTestMessageUrl(info);
       if (previewUrl) {
-        logger.info(`Nodemailer Ethereal Delivery Link (Open to View Email): ${previewUrl}`);
+        logger.info(`Nodemailer Delivery Preview Link: ${previewUrl}`);
       }
 
       logger.info(`EmailService: Successfully dispatched document access OTP to ${recipientEmail} (Message ID: ${info.messageId})`);
       return { success: true, messageId: info.messageId, simulated: !process.env.EMAIL_USER, previewUrl };
     } catch (err) {
-      logger.warn(`EmailService: SMTP dispatch to ${user.email} not reachable (${err.message}).`);
+      logger.warn(`EmailService: SMTP dispatch to ${recipientEmail} failed (${err.message}).`);
       return { success: false, error: err.message };
     }
   },
 
   /**
    * Sends 6-digit MFA OTP email for Account MFA Setup or Login Challenge.
+   * Priority: Resend HTTPS API (Port 443) -> Nodemailer SMTP Fallback.
    */
   sendMfaSecurityOtp: async ({ user, otp, title = 'Security Verification', description = 'Account Authentication Challenge' }) => {
     let recipientEmail = user.email;
@@ -495,15 +406,7 @@ const emailService = {
       otp,
     });
 
-    // 1. Try Brevo HTTPS REST API (Port 443 - 300 free emails/day to any address)
-    if (process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY) {
-      const brevoResult = await sendViaBrevoApi({ to: recipientEmail, subject, html, text });
-      if (brevoResult?.success) {
-        return { success: true, messageId: brevoResult.messageId, provider: brevoResult.provider };
-      }
-    }
-
-    // 2. Try Resend HTTPS REST API (Port 443)
+    // 1. Primary Dispatch: Resend HTTPS REST API (Port 443 - 100% Render compatible)
     if (process.env.RESEND_API_KEY) {
       const resendResult = await sendViaResendApi({ to: recipientEmail, subject, html, text });
       if (resendResult?.success) {
@@ -511,15 +414,7 @@ const emailService = {
       }
     }
 
-    // 3. Try SendGrid HTTPS REST API (Port 443)
-    if (process.env.SENDGRID_API_KEY) {
-      const sendgridResult = await sendViaSendGridApi({ to: recipientEmail, subject, html, text });
-      if (sendgridResult?.success) {
-        return { success: true, messageId: sendgridResult.messageId, provider: sendgridResult.provider };
-      }
-    }
-
-    // 4. Try Nodemailer SMTP (with fast timeout)
+    // 2. Secondary Fallback: Nodemailer SMTP
     try {
       const activeTransporter = await getTransporter();
       const fromAddress = process.env.SMTP_FROM || process.env.EMAIL_USER || '"CloudShield Security" <security@cloudshield.internal>';
@@ -534,13 +429,13 @@ const emailService = {
 
       const previewUrl = nodemailer.getTestMessageUrl(info);
       if (previewUrl) {
-        logger.info(`Nodemailer Ethereal Delivery Link (Open to View Email): ${previewUrl}`);
+        logger.info(`Nodemailer Delivery Preview Link: ${previewUrl}`);
       }
 
       logger.info(`EmailService: Successfully dispatched MFA Security OTP to ${recipientEmail} (Message ID: ${info.messageId})`);
       return { success: true, messageId: info.messageId, simulated: !process.env.EMAIL_USER, previewUrl };
     } catch (err) {
-      logger.warn(`EmailService: SMTP dispatch to ${user.email} not reachable (${err.message}).`);
+      logger.warn(`EmailService: SMTP dispatch to ${recipientEmail} failed (${err.message}).`);
       return { success: false, error: err.message };
     }
   },
