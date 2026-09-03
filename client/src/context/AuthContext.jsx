@@ -84,6 +84,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data));
       localStorage.setItem('sim_mfa_verified', 'true'); // mark MFA as completed for the zero trust middleware
+      sessionStorage.setItem('session_mfa_verified', 'true');
       setToken(data.token);
       setUser(data);
       setMfaTempData(null);
@@ -136,6 +137,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('sim_mfa_verified');
+    sessionStorage.removeItem('session_mfa_verified');
     sessionStorage.removeItem('unlocked_resources');
     setUser(null);
     setToken(null);

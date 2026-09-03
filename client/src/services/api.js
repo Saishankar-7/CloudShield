@@ -17,7 +17,7 @@ export const apiFetch = async (endpoint, options = {}) => {
   const simulatedIp = localStorage.getItem('sim_ip') || '192.168.1.10';
   const country = localStorage.getItem('sim_country') || 'India';
   const city = localStorage.getItem('sim_city') || 'Mumbai';
-  const mfaVerified = localStorage.getItem('sim_mfa_verified') || 'false';
+  const mfaVerified = sessionStorage.getItem('session_mfa_verified') || localStorage.getItem('sim_mfa_verified') || 'false';
 
   const headers = {
     'Content-Type': 'application/json',

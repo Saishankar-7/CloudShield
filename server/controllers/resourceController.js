@@ -63,6 +63,13 @@ const getResources = async (req, res) => {
           locationInfo,
         });
 
+        // If user already completed MFA during this session, grant Allow for MFA_Required decisions
+        const isMfaSessionActive = req.headers['x-mfa-verified'] === 'true' || user.role === 'admin';
+        if (decision === 'MFA_Required' && isMfaSessionActive) {
+          decision = 'Allow';
+          reason = 'Access granted via session Multi-Factor Authentication';
+        }
+
         // Check if there is an approved access request override
         let isOverridden = false;
         const isExplicitlyRevokedOrDisabled =

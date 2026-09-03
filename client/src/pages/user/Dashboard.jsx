@@ -161,7 +161,8 @@ const Dashboard = () => {
     setMfaCode('');
     setOtpSent(false);
 
-    // Check if user has already verified OTP for this document during this login session
+    // Check if user has already verified OTP during this login session
+    const isMfaSessionActive = sessionStorage.getItem('session_mfa_verified') === 'true' || localStorage.getItem('sim_mfa_verified') === 'true';
     let unlocked = [];
     try {
       unlocked = JSON.parse(sessionStorage.getItem('unlocked_resources') || '[]');
@@ -169,9 +170,14 @@ const Dashboard = () => {
       unlocked = [];
     }
 
-    if (unlocked.includes(resource._id)) {
-      // Document is already verified and unlocked for this login session
-      setAccessData(resource);
+    if (isMfaSessionActive || unlocked.includes(resource._id)) {
+      // User entered OTP once -> all documents accessible throughout login session!
+      try {
+        const data = await apiFetch(`/resources/${resource._id}`);
+        setAccessData(data.resource || resource);
+      } catch (e) {
+        setAccessData(resource);
+      }
       setActiveModal('access');
       return;
     }
@@ -275,6 +281,7 @@ const Dashboard = () => {
       }
 
       // Set verification flag in session headers & unlocked document cache
+      sessionStorage.setItem('session_mfa_verified', 'true');
       localStorage.setItem('sim_mfa_verified', 'true');
       try {
         const unlocked = JSON.parse(sessionStorage.getItem('unlocked_resources') || '[]');

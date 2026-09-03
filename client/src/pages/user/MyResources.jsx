@@ -107,7 +107,8 @@ const MyResources = () => {
     setAccessData(null);
     setOtpSent(false);
 
-    // Check if user has already verified OTP for this document during this login session
+    // Check if user has already verified OTP during this login session
+    const isMfaSessionActive = sessionStorage.getItem('session_mfa_verified') === 'true' || localStorage.getItem('sim_mfa_verified') === 'true';
     let unlocked = [];
     try {
       unlocked = JSON.parse(sessionStorage.getItem('unlocked_resources') || '[]');
@@ -115,9 +116,14 @@ const MyResources = () => {
       unlocked = [];
     }
 
-    if (unlocked.includes(resource._id)) {
-      // Document is already verified and unlocked for this login session
-      setAccessData(resource);
+    if (isMfaSessionActive || unlocked.includes(resource._id)) {
+      // User entered OTP once -> all documents accessible throughout login session!
+      try {
+        const data = await apiFetch(`/resources/${resource._id}`);
+        setAccessData(data.resource || resource);
+      } catch (e) {
+        setAccessData(resource);
+      }
       setActiveModal('access');
       return;
     }
@@ -197,6 +203,7 @@ const MyResources = () => {
         }
       } catch (e) {}
 
+      sessionStorage.setItem('session_mfa_verified', 'true');
       localStorage.setItem('sim_mfa_verified', 'true');
       setMfaSuccess('Identity verified successfully! Unlocking resource payload...');
       setTimeout(() => {

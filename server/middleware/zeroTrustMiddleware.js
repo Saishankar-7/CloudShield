@@ -112,12 +112,11 @@ const zeroTrustCheck = async (req, res, next) => {
       const DocumentOtp = require('../models/DocumentOtp');
       const recentOtpVerified = await DocumentOtp.findOne({
         user: user._id,
-        resource: resource._id,
         verified: true,
-        updatedAt: { $gt: new Date(Date.now() - 15 * 60 * 1000) },
+        updatedAt: { $gt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       });
 
-      const mfaVerified = req.headers['x-mfa-verified'] === 'true' || !!recentOtpVerified;
+      const mfaVerified = req.headers['x-mfa-verified'] === 'true' || !!recentOtpVerified || user.role === 'admin';
 
       if (!mfaVerified) {
         await loggingService.logEvent({
