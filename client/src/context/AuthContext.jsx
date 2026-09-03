@@ -51,12 +51,11 @@ export const AuthProvider = ({ children }) => {
           email: data.email,
           maskedEmail: data.maskedEmail || data.email,
           tempToken: data.tempToken,
-          inAppOtp: data.inAppOtp || null,
           hasTotp: !!data.hasTotp,
         });
         localStorage.setItem('token', data.tempToken); // temporarily store to authorize verify-mfa request
         setLoading(false);
-        return { mfaRequired: true, inAppOtp: data.inAppOtp };
+        return { mfaRequired: true };
       }
 
       // Normal Login Success

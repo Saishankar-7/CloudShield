@@ -403,8 +403,7 @@ const requestDocumentOtp = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `Zero Trust Security Passcode generated (${maskEmail(targetEmail)})`,
-      inAppOtp: otp, // Delivered for zero-latency Render & Cloud verification
+      message: `Verification code sent to ${maskEmail(targetEmail)}`,
       email: targetEmail,
       maskedEmail: maskEmail(targetEmail),
       expiresInSeconds: 600,

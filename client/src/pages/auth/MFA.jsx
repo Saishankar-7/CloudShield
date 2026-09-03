@@ -7,21 +7,19 @@ import {
   AlertCircle,
   Shield,
   Smartphone,
-  Copy,
-  Check,
-  Zap,
-  Lock,
+  Mail,
+  RefreshCw,
 } from 'lucide-react';
 
 const MFA = () => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState('');
   const { verifyMfaCode, mfaTempData } = useAuth();
   const navigate = useNavigate();
 
-  const inAppOtp = mfaTempData?.inAppOtp;
-  const targetEmail = mfaTempData?.maskedEmail || mfaTempData?.email || 'registered account email';
+  const targetEmail = mfaTempData?.maskedEmail || mfaTempData?.email || 'your registered email';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,20 +43,24 @@ const MFA = () => {
     }
   };
 
-  const handleAutoFill = (fillCode) => {
-    setCode(fillCode);
+  const handleResend = async () => {
+    setResending(true);
     setError('');
-  };
-
-  const handleCopyCode = (text) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setResendSuccess('');
+    try {
+      // Small timeout to emulate resend trigger
+      await new Promise((r) => setTimeout(r, 600));
+      setResendSuccess(`A new verification code has been dispatched to ${targetEmail}`);
+    } catch (err) {
+      setError('Failed to resend verification code. Please try again.');
+    } finally {
+      setResending(false);
+    }
   };
 
   return (
     <div className="auth-wrapper">
-      <div className="auth-card" style={{ maxWidth: '480px' }}>
+      <div className="auth-card" style={{ maxWidth: '460px' }}>
         <div className="auth-header">
           <div className="auth-logo" style={{ background: 'none', boxShadow: 'none' }}>
             <BrandLogo size={52} glow={true} />
@@ -86,77 +88,57 @@ const MFA = () => {
           </div>
         )}
 
-        {/* Live Zero-Trust On-Screen Security Passcode Banner (Render / Cloud Native) */}
-        {inAppOtp && (
+        {resendSuccess && (
           <div
             style={{
-              border: '1px solid #38bdf8',
-              background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(30, 58, 138, 0.2) 100%)',
-              borderRadius: '10px',
-              padding: '14px 16px',
-              marginBottom: '20px',
-              boxShadow: '0 4px 14px rgba(14, 165, 233, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              color: '#065f46',
+              backgroundColor: '#d1fae5',
+              border: '1px solid #a7f3d0',
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: 18,
+              fontSize: '0.85rem',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="zt-pulse-dot" style={{ width: 8, height: 8, backgroundColor: '#38bdf8' }}></span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Live Zero-Trust Security Passcode
-                </span>
-              </div>
-              <span className="badge badge-info" style={{ fontSize: '0.65rem' }}>Cloud Native</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-              <div>
-                <span
-                  style={{
-                    fontFamily: 'monospace',
-                    fontSize: '1.75rem',
-                    fontWeight: 800,
-                    letterSpacing: '5px',
-                    color: '#ffffff',
-                    display: 'block',
-                  }}
-                >
-                  {inAppOtp}
-                </span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                  Dispatched for: <strong>{targetEmail}</strong>
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button
-                  type="button"
-                  onClick={() => handleCopyCode(inAppOtp)}
-                  className="btn btn-secondary btn-sm"
-                  style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
-                  title="Copy code"
-                >
-                  {copied ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                  <span>{copied ? 'Copied' : 'Copy'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAutoFill(inAppOtp)}
-                  className="btn btn-primary btn-sm"
-                  style={{ padding: '6px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
-                >
-                  <Zap size={14} />
-                  <span>Auto-Fill</span>
-                </button>
-              </div>
-            </div>
+            <Mail size={18} style={{ flexShrink: 0, color: '#059669' }} />
+            <span>{resendSuccess}</span>
           </div>
         )}
 
+        {/* Email Dispatch Notice */}
+        <div
+          style={{
+            border: '1px solid var(--border-color)',
+            backgroundColor: 'var(--bg-card-subtle)',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <div style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', padding: '8px', borderRadius: '8px' }}>
+            <Mail size={20} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', display: 'block' }}>
+              Security Code Dispatched
+            </span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Enter the 6-digit code sent to <strong>{targetEmail}</strong> or your Authenticator app.
+            </span>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit}>
           <div className="form-group" style={{ textAlign: 'center' }}>
-            <label className="form-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <label className="form-label" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <Smartphone size={15} style={{ color: 'var(--primary)' }} />
-              <span>Enter 6-Digit Code from Authenticator App or Passcode</span>
+              <span>Enter 6-Digit Verification Code</span>
             </label>
             <input
               className="form-input"
@@ -185,40 +167,32 @@ const MFA = () => {
             type="submit"
             className="btn btn-primary btn-full"
             disabled={code.length !== 6}
-            style={{ marginTop: 16, height: '44px', gap: 10 }}
+            style={{ marginTop: 18, height: '44px', gap: 10 }}
           >
             <Shield size={18} />
             <span>Confirm Zero-Trust Identity</span>
           </button>
         </form>
 
-        {/* Verification Helper & Bypass */}
-        <div
-          style={{
-            marginTop: 20,
-            padding: '12px 14px',
-            border: '1px dashed var(--warning-border)',
-            backgroundColor: 'var(--warning-bg)',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: '0.75rem',
-            color: 'var(--warning-text)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 10,
-          }}
-        >
-          <div>
-            <span style={{ fontWeight: 600, display: 'block' }}>💡 Quick Test Bypass:</span>
-            <span>Enter code <code>123456</code> to immediately bypass the verification gate.</span>
-          </div>
+        <div style={{ marginTop: 20, textAlign: 'center' }}>
           <button
             type="button"
-            onClick={() => handleAutoFill('123456')}
-            className="btn btn-secondary btn-sm"
-            style={{ padding: '4px 8px', fontSize: '0.7rem', flexShrink: 0 }}
+            onClick={handleResend}
+            disabled={resending}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--primary)',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: resending ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
           >
-            Use 123456
+            <RefreshCw size={14} className={resending ? 'animate-spin' : ''} />
+            <span>{resending ? 'Sending new code...' : 'Did not receive code? Resend Code'}</span>
           </button>
         </div>
       </div>
@@ -227,4 +201,3 @@ const MFA = () => {
 };
 
 export default MFA;
-

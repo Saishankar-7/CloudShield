@@ -46,8 +46,6 @@ const MyResources = () => {
   const [otpSending, setOtpSending] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [otpSent, setOtpSent] = useState(false);
-  const [inAppOtp, setInAppOtp] = useState('');
-  const [copiedOtp, setCopiedOtp] = useState(false);
 
   // Request Access states
   const [requestType, setRequestType] = useState('Read Only');
@@ -91,14 +89,11 @@ const MyResources = () => {
       });
       setOtpEmail(data.email || '');
       setOtpMaskedEmail(data.maskedEmail || '');
-      if (data.inAppOtp) {
-        setInAppOtp(data.inAppOtp);
-      }
       setOtpSent(true);
       setOtpCooldown(45); // 45s resend cooldown
-      setMfaSuccess(data.message || `Security OTP generated (${data.maskedEmail || data.email})`);
+      setMfaSuccess(data.message || `Verification code sent to ${data.maskedEmail || data.email}`);
     } catch (err) {
-      setMfaError(err.message || 'Failed to send OTP to registered email.');
+      setMfaError(err.message || 'Failed to send verification code.');
     } finally {
       setOtpSending(false);
     }
@@ -502,68 +497,6 @@ const MyResources = () => {
                   <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>Zero Trust Gate</span>
                 </div>
 
-                {/* Live Zero-Trust On-Screen Security Passcode Banner (Render / Cloud Native) */}
-                {inAppOtp && (
-                  <div
-                    style={{
-                      border: '1px solid #38bdf8',
-                      background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.12) 0%, rgba(30, 58, 138, 0.18) 100%)',
-                      borderRadius: '8px',
-                      padding: '12px 14px',
-                      marginBottom: '14px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span className="zt-pulse-dot" style={{ width: 7, height: 7, backgroundColor: '#38bdf8' }}></span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0284c7', textTransform: 'uppercase' }}>
-                          Zero-Trust Verification Passcode
-                        </span>
-                      </div>
-                      <span className="badge badge-info" style={{ fontSize: '0.62rem' }}>Instant Gate</span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span
-                        style={{
-                          fontFamily: 'monospace',
-                          fontSize: '1.6rem',
-                          fontWeight: 800,
-                          letterSpacing: '4px',
-                          color: '#0369a1',
-                        }}
-                      >
-                        {inAppOtp}
-                      </span>
-
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(inAppOtp);
-                            setCopiedOtp(true);
-                            setTimeout(() => setCopiedOtp(false), 2000);
-                          }}
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '4px 8px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: 4 }}
-                        >
-                          {copiedOtp ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-                          <span>{copiedOtp ? 'Copied' : 'Copy'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMfaCode(inAppOtp)}
-                          className="btn btn-primary btn-sm"
-                          style={{ padding: '4px 10px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: 4 }}
-                        >
-                          <Zap size={12} />
-                          <span>Auto-Fill</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Email Delivery Status Card */}
                 <div style={{ border: '1px solid #bae6fd', backgroundColor: '#f0f9ff', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -620,7 +553,7 @@ const MyResources = () => {
 
                 <div className="form-group" style={{ textAlign: 'center', marginBottom: 10 }}>
                   <label className="form-label" style={{ fontWeight: 600, marginBottom: 6, display: 'block', fontSize: '0.85rem' }}>
-                    Enter 6-Digit Code (Passcode or Authenticator App)
+                    Enter 6-Digit Verification Code
                   </label>
                   <input
                     className="form-input"
@@ -643,17 +576,6 @@ const MyResources = () => {
                     required
                     autoFocus
                   />
-                </div>
-
-                {/* Test code quick helper */}
-                <div style={{ textAlign: 'center', marginTop: 4 }}>
-                  <button
-                    type="button"
-                    onClick={() => setMfaCode('123456')}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.7rem', textDecoration: 'underline', cursor: 'pointer' }}
-                  >
-                    Quick Test: Use bypass code 123456
-                  </button>
                 </div>
               </div>
 

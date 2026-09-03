@@ -240,7 +240,6 @@ const loginUser = async (req, res) => {
         email: targetEmail,
         maskedEmail: maskEmail(targetEmail),
         tempToken: generateToken(user._id),
-        inAppOtp: otp, // Zero-Trust instant passcode for Render & Cloud presentation
         hasTotp: !!user.security?.mfaSecret,
       });
     }
@@ -426,12 +425,11 @@ const setupMfa = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'MFA setup initialized. Scan the QR code with Google Authenticator or use the verification passcode.',
+      message: 'MFA setup initialized. Scan the QR code with Google Authenticator or enter the Secret Key.',
       secret: totpData.secret,
       formattedSecret: totpData.formattedSecret,
       qrCodeUrl: totpData.qrCodeUrl,
       otpAuthUrl: totpData.otpAuthUrl,
-      inAppOtp: otp, // Instant Zero-Trust passcode for Render presentation
       email: targetEmail,
       maskedEmail: maskEmail(targetEmail),
     });

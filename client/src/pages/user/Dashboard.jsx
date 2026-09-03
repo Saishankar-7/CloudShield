@@ -50,8 +50,6 @@ const Dashboard = () => {
   const [otpSent, setOtpSent] = useState(false);
   const [otpEmail, setOtpEmail] = useState('');
   const [otpMaskedEmail, setOtpMaskedEmail] = useState('');
-  const [inAppOtp, setInAppOtp] = useState('');
-  const [copiedOtp, setCopiedOtp] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [mfaVerifying, setMfaVerifying] = useState(false);
   const [requestReason, setRequestReason] = useState('');
@@ -137,11 +135,8 @@ const Dashboard = () => {
       setOtpSent(true);
       setOtpEmail(data.email || '');
       setOtpMaskedEmail(data.maskedEmail || data.email || '');
-      if (data.inAppOtp) {
-        setInAppOtp(data.inAppOtp);
-      }
       setOtpCooldown(45); // 45s cooldown
-      setMfaSuccess(data.message || `Security OTP generated (${data.maskedEmail || data.email})`);
+      setMfaSuccess(data.message || `Verification code sent to ${data.maskedEmail || data.email}`);
     } catch (err) {
       setMfaError(err.message || 'Failed to send OTP to registered email.');
     } finally {
@@ -152,7 +147,6 @@ const Dashboard = () => {
   const setErrorCleanups = () => {
     setMfaCode('');
     setMfaError('');
-    setInAppOtp('');
     setRequestReason('');
     setRequestError('');
     setRequestSuccess(false);
@@ -166,7 +160,6 @@ const Dashboard = () => {
     setMfaSuccess('');
     setMfaCode('');
     setOtpSent(false);
-    setInAppOtp('');
 
     // Only prompt for MFA if the Zero-Trust Policy Engine determined MFA is required
     // (e.g. Admin set MFA Requirement to 'Always Required' or high risk triggered MFA challenge)
@@ -820,79 +813,6 @@ const Dashboard = () => {
                   <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>MFA Required</span>
                 </div>
 
-                {/* Live Zero-Trust On-Screen Security Passcode Banner (Render / Cloud Native) */}
-                {inAppOtp && (
-                  <div
-                    style={{
-                      border: '1px solid #38bdf8',
-                      background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(30, 58, 138, 0.2) 100%)',
-                      borderRadius: '10px',
-                      padding: '14px 16px',
-                      marginBottom: '16px',
-                      boxShadow: '0 4px 14px rgba(14, 165, 233, 0.1)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span className="zt-pulse-dot" style={{ width: 8, height: 8, backgroundColor: '#38bdf8' }}></span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Live Security Passcode
-                        </span>
-                      </div>
-                      <span className="badge badge-info" style={{ fontSize: '0.65rem' }}>Cloud Native</span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                      <div>
-                        <span
-                          style={{
-                            fontFamily: 'monospace',
-                            fontSize: '1.6rem',
-                            fontWeight: 800,
-                            letterSpacing: '4px',
-                            color: '#ffffff',
-                            display: 'block',
-                          }}
-                        >
-                          {inAppOtp}
-                        </span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                          Dispatched for: <strong>{otpMaskedEmail || otpEmail || user?.email}</strong>
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(inAppOtp);
-                            setCopiedOtp(true);
-                            setTimeout(() => setCopiedOtp(false), 2000);
-                          }}
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
-                          title="Copy code"
-                        >
-                          {copiedOtp ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                          <span>{copiedOtp ? 'Copied' : 'Copy'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMfaCode(inAppOtp);
-                            setMfaError('');
-                          }}
-                          className="btn btn-primary btn-sm"
-                          style={{ padding: '6px 12px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
-                        >
-                          <Zap size={14} />
-                          <span>Auto-Fill</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Email Delivery Status Card */}
                 <div style={{ border: '1px solid #bae6fd', backgroundColor: '#f0f9ff', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -953,7 +873,7 @@ const Dashboard = () => {
                 <div className="form-group" style={{ textAlign: 'center', marginBottom: 12 }}>
                   <label className="form-label" style={{ fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                     <Smartphone size={15} style={{ color: 'var(--primary)' }} />
-                    <span>Enter 6-Digit Passcode or Authenticator Code</span>
+                    <span>Enter 6-Digit Verification Code</span>
                   </label>
                   <input
                     className="form-input"
@@ -976,9 +896,6 @@ const Dashboard = () => {
                     required
                     autoFocus
                   />
-                </div>
-                <div style={{ marginTop: 16, padding: '12px', border: '1px dashed var(--warning-border)', backgroundColor: 'var(--warning-bg)', borderRadius: '8px', fontSize: '0.725rem', color: 'var(--warning-text)', lineHeight: 1.3 }}>
-                  <b>Zero-Trust Verification:</b> Click <b>Auto-Fill</b> above, enter code from your Authenticator app, or use testing bypass code <code>123456</code>.
                 </div>
               </div>
 
