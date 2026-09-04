@@ -191,10 +191,20 @@ const reviewRequest = async (req, res) => {
     } else if (status === 'Approved') {
       if (request.resource) {
         const resourceDoc = await Resource.findById(request.resource._id);
-        if (resourceDoc && resourceDoc.blockedUsers && resourceDoc.blockedUsers.length > 0) {
-          resourceDoc.blockedUsers = resourceDoc.blockedUsers.filter(
-            (uid) => (uid._id || uid).toString() !== request.user._id.toString()
-          );
+        if (resourceDoc) {
+          if (resourceDoc.blockedUsers && resourceDoc.blockedUsers.length > 0) {
+            resourceDoc.blockedUsers = resourceDoc.blockedUsers.filter(
+              (uid) => (uid._id || uid).toString() !== request.user._id.toString()
+            );
+          }
+          if (resourceDoc.allowedUsers && resourceDoc.allowedUsers.length > 0) {
+            const isAlreadyAllowed = resourceDoc.allowedUsers.some(
+              (uid) => (uid._id || uid).toString() === request.user._id.toString()
+            );
+            if (!isAlreadyAllowed) {
+              resourceDoc.allowedUsers.push(request.user._id);
+            }
+          }
           await resourceDoc.save();
         }
       }

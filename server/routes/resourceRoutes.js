@@ -16,6 +16,7 @@ const {
   getDocumentsRecords,
   getReportsRecords,
   getAnalyticsRecords,
+  getAdminPanelRecords,
   streamResource,
 } = require('../controllers/resourceController');
 const { protect } = require('../middleware/authMiddleware');
@@ -31,6 +32,7 @@ router.get('/employee-data/records', protect, getEmployeeDataRecords);
 router.get('/documents/records', protect, getDocumentsRecords);
 router.get('/reports/records', protect, getReportsRecords);
 router.get('/analytics/records', protect, getAnalyticsRecords);
+router.get('/admin-panel/records', protect, getAdminPanelRecords);
 
 // Stream or Download Decrypted Document (PDF / Cloudinary / Local Vault)
 router.get('/:id/stream', protect, streamResource);

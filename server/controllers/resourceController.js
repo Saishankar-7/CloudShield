@@ -984,6 +984,25 @@ const getAnalyticsRecords = async (req, res) => {
 };
 
 /**
+ * Get Synthetic Administrative Panel & Infrastructure Console Telemetry
+ */
+const getAdminPanelRecords = async (req, res) => {
+  try {
+    const { SYNTHETIC_ADMIN_PANEL } = require('../services/syntheticDataService');
+    const resource = await Resource.findOne({ name: { $regex: /admin panel/i } }) || await Resource.findOne({ category: 'Infrastructure' });
+
+    res.status(200).json({
+      success: true,
+      adminData: SYNTHETIC_ADMIN_PANEL,
+      resource,
+    });
+  } catch (error) {
+    logger.error(`getAdminPanelRecords error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to fetch admin panel records', error: error.message });
+  }
+};
+
+/**
  * Stream or Download Decrypted Resource Document (Cloudinary / Local / Dynamic Generator)
  */
 const streamResource = async (req, res) => {
@@ -1217,5 +1236,6 @@ module.exports = {
   getDocumentsRecords,
   getReportsRecords,
   getAnalyticsRecords,
+  getAdminPanelRecords,
   streamResource,
 };

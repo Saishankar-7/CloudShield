@@ -8,6 +8,7 @@ import EmployeeDataViewer from '../../components/EmployeeDataViewer';
 import CompanyDocumentsViewer from '../../components/CompanyDocumentsViewer';
 import ReportsViewer from '../../components/ReportsViewer';
 import AnalyticsDashboardViewer from '../../components/AnalyticsDashboardViewer';
+import AdminPanelTerminalViewer from '../../components/AdminPanelTerminalViewer';
 import BrandLogo from '../../components/BrandLogo';
 import {
   Shield,
@@ -708,6 +709,8 @@ const Dashboard = () => {
                   <ReportsViewer resource={selectedRes} />
                 ) : (selectedRes.name === 'Dashboard Analytics' || selectedRes.name?.toLowerCase().includes('analytic')) ? (
                   <AnalyticsDashboardViewer resource={selectedRes} />
+                ) : (selectedRes.name === 'Admin Panel' || selectedRes.name?.toLowerCase().includes('admin') || selectedRes.type === 'System' || selectedRes.category === 'Infrastructure') ? (
+                  <AdminPanelTerminalViewer resource={selectedRes} />
                 ) : (() => {
                   const activeResource = accessData || selectedRes;
                   const cloud = activeResource.cloudStorage || {};
