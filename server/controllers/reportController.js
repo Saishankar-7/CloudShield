@@ -36,9 +36,30 @@ const getEmployeeStats = async (req, res) => {
     const deniedTrend = [0, 1, 0, 2, 1, 0, deniedCount || 2];
     const mfaTrend = [1, 0, 2, 1, 1, 0, mfaCount || 1];
 
+    const calculateRisk = require('../utils/calculateRisk');
+    const deviceInfo = {
+      deviceId: req.headers['x-device-id'] || 'device-trusted-sai-win',
+      deviceName: req.headers['x-device-name'] || req.headers['user-agent'] || 'Chrome 124 on Windows 11',
+      browser: req.headers['x-device-browser'] || 'Chrome',
+      os: req.headers['x-device-os'] || 'Windows 11',
+      ip: req.headers['x-simulated-ip'] || req.ip || '192.168.1.10',
+    };
+    const locationInfo = {
+      country: req.headers['x-location-country'] || 'India',
+      city: req.headers['x-location-city'] || 'Mumbai',
+    };
+
+    const { score, riskLevel } = calculateRisk({
+      user: req.user,
+      deviceInfo,
+      locationInfo,
+    });
+
     res.status(200).json({
-      riskScore: req.user.riskScore,
-      riskLevel: req.user.riskLevel,
+      riskScore: score,
+      riskLevel: riskLevel,
+      deviceInfo,
+      locationInfo,
       allowedCount: (allowedCount || 0) + 24, // include a baseline offset for visual fidelity
       deniedCount: (deniedCount || 0) + 2,
       mfaCount: (mfaCount || 0) + 1,

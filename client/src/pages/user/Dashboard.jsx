@@ -348,7 +348,10 @@ const Dashboard = () => {
     );
   }
 
-  const isDeviceTrusted = simDeviceId === 'device-trusted-sai-win';
+  const isDeviceTrusted =
+    (user?.trustedDevices || []).some(
+      (d) => d.deviceId === simDeviceId && d.isTrusted
+    ) || simDeviceId === 'device-trusted-sai-win';
 
   return (
     <div className="content-body">
@@ -422,13 +425,25 @@ const Dashboard = () => {
                 style={{ padding: '8px 12px' }}
                 value={simDeviceId}
                 onChange={(e) => {
-                  setSimDeviceId(e.target.value);
-                  setSimDevice(e.target.value === 'device-trusted-sai-win' ? 'Chrome 124 on Windows 11' : 'Safari 17 on macOS');
+                  const val = e.target.value;
+                  setSimDeviceId(val);
+                  if (val === 'device-trusted-sai-win') {
+                    setSimDevice('Chrome 124 on Windows 11');
+                  } else if (val === 'device-unrecognized-mac') {
+                    setSimDevice('Safari 17 on macOS');
+                  } else if (val === 'device-unrecognized-android') {
+                    setSimDevice('Opera on Android 14');
+                  } else if (val === 'device-unrecognized-linux') {
+                    setSimDevice('Firefox on Ubuntu Linux');
+                  } else {
+                    setSimDevice('Unknown Device');
+                  }
                 }}
               >
-                <option value="device-trusted-sai-win">Chrome on Windows 11 (Trusted)</option>
-                <option value="device-unrecognized-mac">Safari on macOS (Untrusted)</option>
-                <option value="device-unrecognized-android">Opera on Android (Untrusted)</option>
+                <option value="device-trusted-sai-win">Chrome 124 on Windows 11 (Trusted)</option>
+                <option value="device-unrecognized-mac">Safari 17 on macOS (Untrusted)</option>
+                <option value="device-unrecognized-android">Opera on Android 14 (Untrusted)</option>
+                <option value="device-unrecognized-linux">Firefox on Ubuntu Linux (Untrusted)</option>
               </select>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -445,11 +460,11 @@ const Dashboard = () => {
       <div className="stats-grid">
         <StatCard
           title="Risk Level"
-          value={user.riskLevel}
+          value={stats?.riskLevel || user.riskLevel}
           icon={Shield}
-          iconColor={user.riskLevel === 'Low' ? 'var(--success)' : 'var(--danger)'}
-          iconBg={user.riskLevel === 'Low' ? 'var(--success-bg)' : 'var(--danger-bg)'}
-          trendText="Your access profile is evaluated securely"
+          iconColor={(stats?.riskLevel || user.riskLevel) === 'Low' ? 'var(--success)' : (stats?.riskLevel || user.riskLevel) === 'Medium' ? 'var(--warning)' : 'var(--danger)'}
+          iconBg={(stats?.riskLevel || user.riskLevel) === 'Low' ? 'var(--success-bg)' : (stats?.riskLevel || user.riskLevel) === 'Medium' ? 'rgba(245, 158, 11, 0.15)' : 'var(--danger-bg)'}
+          trendText={`Current Score: ${stats?.riskScore !== undefined ? stats.riskScore : user.riskScore}/100`}
         />
         <StatCard
           title="Allowed Access"
@@ -599,17 +614,42 @@ const Dashboard = () => {
       <div className="footer-status-bar">
         <div className="status-metric">
           <span className="status-label">Current Risk Score:</span>
-          <span className="status-value-bold" style={{ color: user.riskLevel === 'Low' ? 'var(--success)' : 'var(--danger)' }}>
-            {user.riskScore} / 100
+          <span
+            className="status-value-bold"
+            style={{
+              color:
+                (stats?.riskLevel || user.riskLevel) === 'Low'
+                  ? 'var(--success)'
+                  : (stats?.riskLevel || user.riskLevel) === 'Medium'
+                  ? 'var(--warning)'
+                  : 'var(--danger)',
+            }}
+          >
+            {stats?.riskScore !== undefined ? stats.riskScore : user.riskScore} / 100
           </span>
-          <span className="badge badge-success" style={{ padding: '2px 6px', fontSize: '0.7rem' }}>
-            {user.riskLevel} RISK
+          <span
+            className={`badge ${
+              (stats?.riskLevel || user.riskLevel) === 'Low'
+                ? 'badge-success'
+                : (stats?.riskLevel || user.riskLevel) === 'Medium'
+                ? 'badge-warning'
+                : 'badge-danger'
+            }`}
+            style={{ padding: '2px 8px', fontSize: '0.7rem', textTransform: 'uppercase' }}
+          >
+            {stats?.riskLevel || user.riskLevel} RISK
           </span>
         </div>
         <div className="status-metric">
           <Laptop size={16} style={{ color: 'var(--text-muted)' }} />
           <span className="status-label">Device:</span>
-          <span className="status-value-bold">{isDeviceTrusted ? 'Trusted Device' : 'Unrecognized Device'}</span>
+          <span className="status-value-bold">{simDevice || 'Chrome 124 on Windows 11'}</span>
+          <span
+            className={`badge ${isDeviceTrusted ? 'badge-success' : 'badge-danger'}`}
+            style={{ padding: '2px 8px', fontSize: '0.675rem', fontWeight: 600, marginLeft: 6 }}
+          >
+            {isDeviceTrusted ? 'Trusted' : 'Untrusted'}
+          </span>
         </div>
         <div className="status-metric">
           <Globe size={16} style={{ color: 'var(--text-muted)' }} />

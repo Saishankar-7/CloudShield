@@ -12,7 +12,7 @@ export const apiFetch = async (endpoint, options = {}) => {
   const token = localStorage.getItem('token');
   
   // Retrieve simulated headers from localStorage (set in user Profile/Security tab)
-  const deviceId = localStorage.getItem('sim_device_id') || 'dev-trusted-sai-win';
+  const deviceId = localStorage.getItem('sim_device_id') || 'device-trusted-sai-win';
   const deviceName = localStorage.getItem('sim_device_name') || 'Chrome 124 on Windows 11';
   const simulatedIp = localStorage.getItem('sim_ip') || '192.168.1.10';
   const country = localStorage.getItem('sim_country') || 'India';
