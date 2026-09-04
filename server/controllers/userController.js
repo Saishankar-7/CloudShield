@@ -105,6 +105,15 @@ const createUser = async (req, res) => {
   }
 };
 
+// Check if user is the fixed primary root super administrator
+const isPrimarySuperAdmin = (u) => {
+  if (!u) return false;
+  return (
+    u.email?.toLowerCase() === 'admin@company.com' ||
+    u.employeeId === 'EMP-2025-0001'
+  );
+};
+
 /**
  * Update a user's status (Active, Inactive, Blocked)
  */
@@ -120,9 +129,14 @@ const updateUserStatus = async (req, res) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
-    // Protection rule: Prevent blocking administrator accounts
-    if (user.role === 'admin' && status === 'blocked') {
-      return res.status(403).json({ message: 'Protected Account: Administrator accounts cannot be blocked.' });
+    // Protection rule: Primary super admin cannot be blocked
+    if (isPrimarySuperAdmin(user) && status === 'blocked') {
+      return res.status(403).json({ message: 'Protected Root Account: Primary Super Administrator cannot be blocked.' });
+    }
+
+    // Protection rule: Prevent blocking own currently logged in account
+    if (req.user && req.user._id.toString() === user._id.toString() && status === 'blocked') {
+      return res.status(400).json({ message: 'You cannot block your own currently logged-in account.' });
     }
 
     const oldStatus = user.status;
@@ -169,9 +183,14 @@ const updateUserRole = async (req, res) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
-    // Protection rule: Admin role cannot be changed / demoted
-    if (user.role === 'admin' && role !== 'admin') {
-      return res.status(403).json({ message: 'Protected Account: Administrator roles cannot be changed or demoted.' });
+    // Protection rule: Primary super admin role cannot be changed
+    if (isPrimarySuperAdmin(user) && role !== 'admin') {
+      return res.status(403).json({ message: 'Protected Root Account: Primary Super Administrator role cannot be changed.' });
+    }
+
+    // Protection rule: Prevent demoting own currently logged in account
+    if (req.user && req.user._id.toString() === user._id.toString() && role !== 'admin') {
+      return res.status(400).json({ message: 'You cannot demote your own currently logged-in account.' });
     }
 
     const oldRole = user.role;
@@ -237,9 +256,14 @@ const deleteUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
-    // Protection rule: Administrator accounts cannot be deleted
-    if (user.role === 'admin') {
-      return res.status(403).json({ message: 'Protected Account: Administrator accounts cannot be deleted.' });
+    // Protection rule: Primary super admin account cannot be deleted
+    if (isPrimarySuperAdmin(user)) {
+      return res.status(403).json({ message: 'Protected Root Account: Primary Super Administrator account cannot be deleted.' });
+    }
+
+    // Protection rule: Prevent deleting own currently logged in account
+    if (req.user && req.user._id.toString() === user._id.toString()) {
+      return res.status(400).json({ message: 'You cannot delete your own currently logged-in account.' });
     }
 
     await User.findByIdAndDelete(req.params.id);

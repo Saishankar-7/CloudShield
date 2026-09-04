@@ -20,6 +20,15 @@ import {
   Lock
 } from 'lucide-react';
 
+// Check if user is the fixed primary root super administrator
+const isPrimarySuperAdmin = (u) => {
+  if (!u) return false;
+  return (
+    u.email?.toLowerCase() === 'admin@company.com' ||
+    u.employeeId === 'EMP-2025-0001'
+  );
+};
+
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -369,7 +378,7 @@ const UserManagement = () => {
                   )}
                 </td>
                 <td>
-                  {uItem.role === 'admin' ? (
+                  {isPrimarySuperAdmin(uItem) ? (
                     <div
                       style={{
                         display: 'inline-flex',
@@ -383,10 +392,10 @@ const UserManagement = () => {
                         fontWeight: 600,
                         color: 'var(--primary)',
                       }}
-                      title="Administrator role is protected and cannot be modified"
+                      title="Primary Super Administrator account is fixed and cannot be modified"
                     >
                       <Shield size={13} />
-                      <span>Admin (Protected)</span>
+                      <span>Super Admin (Fixed)</span>
                     </div>
                   ) : (
                     <select
@@ -403,9 +412,9 @@ const UserManagement = () => {
                   )}
                 </td>
                 <td>
-                  {uItem.role === 'admin' ? (
+                  {isPrimarySuperAdmin(uItem) ? (
                     <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--success-text, #059669)', padding: '4px 6px' }}>
-                      Active (Protected)
+                      Active (Fixed)
                     </span>
                   ) : (
                     <select
@@ -432,11 +441,11 @@ const UserManagement = () => {
                 </td>
                 <td>
                   <div className="action-btn-group">
-                    {uItem.role === 'admin' ? (
+                    {isPrimarySuperAdmin(uItem) ? (
                       <span
                         className="action-btn action-btn-secondary action-btn-icon"
                         style={{ opacity: 0.5, cursor: 'not-allowed' }}
-                        title="Administrator accounts cannot be deleted"
+                        title="Primary Super Administrator account cannot be deleted"
                       >
                         <Lock size={13} />
                       </span>
