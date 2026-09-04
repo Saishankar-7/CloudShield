@@ -24,7 +24,7 @@ const AccessRequestSchema = new Schema(
 
     status: {
       type: String,
-      enum: ['Pending', 'Approved', 'Denied', 'Expired'],
+      enum: ['Pending', 'Approved', 'Denied', 'Expired', 'Revoked'],
       default: 'Pending',
       index: true,
     },

@@ -14,6 +14,7 @@ const StatusBadge = ({ status }) => {
         
       case 'denied':
       case 'blocked':
+      case 'revoked':
       case 'inactive':
       case 'failed':
         return 'badge-danger';
