@@ -18,8 +18,8 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    // Role not authorized, redirect to employee home
-    return <Navigate to="/" replace />;
+    // Role not authorized, redirect to appropriate role home
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/'} replace />;
   }
 
   return <Outlet />;

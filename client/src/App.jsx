@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { BrowserRouter as Router, Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
@@ -26,6 +26,15 @@ import AccessRequests from './pages/admin/AccessRequests';
 import SecurityLogs from './pages/admin/SecurityLogs';
 import RiskMonitor from './pages/admin/RiskMonitor';
 import ReportsAnalytics from './pages/admin/ReportsAnalytics';
+
+// Dynamic Home Router: routes Admin to /admin (SOC Operations) and Employees to / (Employee Command Center)
+const HomeRouter = () => {
+  const { user } = useAuth();
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+  return <Dashboard />;
+};
 
 // Shared Layout Wrapper for Sidebars and Top navbars
 const DashboardLayout = () => {
@@ -54,7 +63,7 @@ function App() {
             {/* Secure Employee Routes */}
             <Route element={<ProtectedRoute allowedRoles={['employee', 'manager', 'admin']} />}>
               <Route element={<DashboardLayout />}>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<HomeRouter />} />
                 <Route path="/resources" element={<MyResources />} />
                 <Route path="/requests" element={<MyRequests />} />
                 <Route path="/history" element={<AccessHistory />} />

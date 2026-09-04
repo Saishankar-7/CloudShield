@@ -65,7 +65,11 @@ const Sidebar = () => {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-logo">
+      <NavLink
+        to={isAdmin ? '/admin' : '/'}
+        className="sidebar-logo"
+        style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '10px' }}
+      >
         <BrandLogo size={32} glow={true} />
         <div>
           <div className="sidebar-logo-text">
@@ -73,7 +77,7 @@ const Sidebar = () => {
           </div>
           <span className="sidebar-logo-sub">Zero Trust Core</span>
         </div>
-      </div>
+      </NavLink>
 
       <nav className="sidebar-nav-container">
         {currentMenu.map((group) => (
