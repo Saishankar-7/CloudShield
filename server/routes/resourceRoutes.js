@@ -11,6 +11,9 @@ const {
   verifyDocumentOtp,
   updateResourceAccess,
   getEmployeeDataRecords,
+  getDocumentsRecords,
+  getReportsRecords,
+  getAnalyticsRecords,
   streamResource,
 } = require('../controllers/resourceController');
 const { protect } = require('../middleware/authMiddleware');
@@ -21,8 +24,11 @@ const upload = require('../middleware/uploadMiddleware');
 // Get all resources evaluated dynamically
 router.get('/', protect, getResources);
 
-// Synthetic Employee Records for Decrypted HR Database Viewer
+// Synthetic Records Viewers for Decrypted Vault Payloads
 router.get('/employee-data/records', protect, getEmployeeDataRecords);
+router.get('/documents/records', protect, getDocumentsRecords);
+router.get('/reports/records', protect, getReportsRecords);
+router.get('/analytics/records', protect, getAnalyticsRecords);
 
 // Stream or Download Decrypted Document (PDF / Cloudinary / Local Vault)
 router.get('/:id/stream', protect, streamResource);

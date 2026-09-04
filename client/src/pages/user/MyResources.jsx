@@ -3,6 +3,9 @@ import { apiFetch, API_URL } from '../../services/api';
 import ResourceCard from '../../components/ResourceCard';
 import BrandLogo from '../../components/BrandLogo';
 import EmployeeDataViewer from '../../components/EmployeeDataViewer';
+import CompanyDocumentsViewer from '../../components/CompanyDocumentsViewer';
+import ReportsViewer from '../../components/ReportsViewer';
+import AnalyticsDashboardViewer from '../../components/AnalyticsDashboardViewer';
 import {
   FolderLock,
   Shield,
@@ -354,6 +357,12 @@ const MyResources = () => {
 
                 {(selectedRes.name === 'Employee Data' || selectedRes.category === 'HR') ? (
                   <EmployeeDataViewer resource={selectedRes} />
+                ) : (selectedRes.name === 'Documents' || (selectedRes.name?.toLowerCase() === 'documents') || (selectedRes.category === 'Business' && selectedRes.name?.toLowerCase().includes('document') && !selectedRes.cloudStorage?.isCloudPdf)) ? (
+                  <CompanyDocumentsViewer resource={selectedRes} />
+                ) : (selectedRes.name === 'Reports' || (selectedRes.category === 'Analytics' && selectedRes.name?.toLowerCase().includes('report'))) ? (
+                  <ReportsViewer resource={selectedRes} />
+                ) : (selectedRes.name === 'Dashboard Analytics' || selectedRes.name?.toLowerCase().includes('analytic')) ? (
+                  <AnalyticsDashboardViewer resource={selectedRes} />
                 ) : (selectedRes.cloudStorage?.isCloudPdf || selectedRes.type === 'PDF Document' || selectedRes.cloudStorage?.fileUrl) ? (
                   <div>
                     {(() => {

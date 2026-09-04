@@ -756,6 +756,64 @@ const getEmployeeDataRecords = async (req, res) => {
 };
 
 /**
+ * Get Synthetic Company Policies & Compliance Documents Library
+ */
+const getDocumentsRecords = async (req, res) => {
+  try {
+    const { SYNTHETIC_DOCUMENTS } = require('../services/syntheticDataService');
+    const resource = await Resource.findOne({ name: { $regex: /^documents$/i } }) || await Resource.findOne({ category: 'Business', type: 'Document' });
+
+    res.status(200).json({
+      success: true,
+      totalCount: SYNTHETIC_DOCUMENTS.length,
+      documents: SYNTHETIC_DOCUMENTS,
+      resource,
+    });
+  } catch (error) {
+    logger.error(`getDocumentsRecords error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to fetch documents records', error: error.message });
+  }
+};
+
+/**
+ * Get Synthetic Engineering, Security & Financial Reports
+ */
+const getReportsRecords = async (req, res) => {
+  try {
+    const { SYNTHETIC_REPORTS } = require('../services/syntheticDataService');
+    const resource = await Resource.findOne({ name: { $regex: /^reports$/i } }) || await Resource.findOne({ category: 'Analytics' });
+
+    res.status(200).json({
+      success: true,
+      reports: SYNTHETIC_REPORTS,
+      resource,
+    });
+  } catch (error) {
+    logger.error(`getReportsRecords error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to fetch reports records', error: error.message });
+  }
+};
+
+/**
+ * Get Synthetic Cloud Operations & Telemetry Dashboard Analytics
+ */
+const getAnalyticsRecords = async (req, res) => {
+  try {
+    const { SYNTHETIC_ANALYTICS } = require('../services/syntheticDataService');
+    const resource = await Resource.findOne({ name: { $regex: /dashboard analytics/i } }) || await Resource.findOne({ name: { $regex: /analytics/i } });
+
+    res.status(200).json({
+      success: true,
+      analytics: SYNTHETIC_ANALYTICS,
+      resource,
+    });
+  } catch (error) {
+    logger.error(`getAnalyticsRecords error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to fetch analytics records', error: error.message });
+  }
+};
+
+/**
  * Stream or Download Decrypted Resource Document (Cloudinary / Local / Dynamic Generator)
  */
 const streamResource = async (req, res) => {
@@ -974,5 +1032,8 @@ module.exports = {
   verifyDocumentOtp,
   updateResourceAccess,
   getEmployeeDataRecords,
+  getDocumentsRecords,
+  getReportsRecords,
+  getAnalyticsRecords,
   streamResource,
 };

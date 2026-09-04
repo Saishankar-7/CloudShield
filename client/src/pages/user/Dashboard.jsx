@@ -4,8 +4,11 @@ import { apiFetch, API_URL } from '../../services/api';
 import StatCard from '../../components/StatCard';
 import ResourceCard from '../../components/ResourceCard';
 import StatusBadge from '../../components/StatusBadge';
-import BrandLogo from '../../components/BrandLogo';
 import EmployeeDataViewer from '../../components/EmployeeDataViewer';
+import CompanyDocumentsViewer from '../../components/CompanyDocumentsViewer';
+import ReportsViewer from '../../components/ReportsViewer';
+import AnalyticsDashboardViewer from '../../components/AnalyticsDashboardViewer';
+import BrandLogo from '../../components/BrandLogo';
 import {
   Shield,
   CheckCircle,
@@ -659,6 +662,12 @@ const Dashboard = () => {
 
                 {(selectedRes.name === 'Employee Data' || selectedRes.category === 'HR') ? (
                   <EmployeeDataViewer resource={selectedRes} />
+                ) : (selectedRes.name === 'Documents' || (selectedRes.name?.toLowerCase() === 'documents') || (selectedRes.category === 'Business' && selectedRes.name?.toLowerCase().includes('document') && !selectedRes.cloudStorage?.isCloudPdf)) ? (
+                  <CompanyDocumentsViewer resource={selectedRes} />
+                ) : (selectedRes.name === 'Reports' || (selectedRes.category === 'Analytics' && selectedRes.name?.toLowerCase().includes('report'))) ? (
+                  <ReportsViewer resource={selectedRes} />
+                ) : (selectedRes.name === 'Dashboard Analytics' || selectedRes.name?.toLowerCase().includes('analytic')) ? (
+                  <AnalyticsDashboardViewer resource={selectedRes} />
                 ) : (() => {
                   const activeResource = accessData || selectedRes;
                   const cloud = activeResource.cloudStorage || {};
