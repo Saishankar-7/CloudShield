@@ -19,7 +19,14 @@ import {
   ExternalLink,
   Lock,
   Shield,
-  UploadCloud
+  UploadCloud,
+  UserX,
+  UserCheck,
+  Users,
+  Search,
+  AlertTriangle,
+  ShieldAlert,
+  Ban
 } from 'lucide-react';
 
 const Resources = () => {
@@ -54,9 +61,11 @@ const Resources = () => {
 
   // Admin Access Control & Permission Management State
   const [managingAccessRes, setManagingAccessRes] = useState(null);
+  const [accessActiveTab, setAccessActiveTab] = useState('policies'); // 'policies' | 'allowed_users' | 'revoked_users'
   const [accessDepts, setAccessDepts] = useState(['All']);
   const [accessRoles, setAccessRoles] = useState(['admin', 'employee', 'manager']);
   const [accessAllowedUsers, setAccessAllowedUsers] = useState([]);
+  const [accessBlockedUsers, setAccessBlockedUsers] = useState([]);
   const [accessUserSearch, setAccessUserSearch] = useState('');
   const [allUsersList, setAllUsersList] = useState([]);
   const [accessMfa, setAccessMfa] = useState('Always Required');
@@ -67,6 +76,11 @@ const Resources = () => {
   const [accessSuccess, setAccessSuccess] = useState('');
   const [accessError, setAccessError] = useState('');
 
+  // Explicit User Revocation Form State
+  const [revokeTargetUserId, setRevokeTargetUserId] = useState('');
+  const [revokeReason, setRevokeReason] = useState('Administrative access restriction');
+  const [revokeActionLoading, setRevokeActionLoading] = useState(false);
+
   const ALL_DEPARTMENTS = ['All', 'Engineering', 'Security', 'Finance', 'HR', 'Operations', 'Sales', 'Executive', 'Legal'];
   const ALL_ROLES = [
     { id: 'admin', label: 'Administrator' },
@@ -74,11 +88,13 @@ const Resources = () => {
     { id: 'manager', label: 'Manager' },
   ];
 
-  const handleOpenAccessModal = (res) => {
+  const handleOpenAccessModal = (res, defaultTab = 'policies') => {
     setManagingAccessRes(res);
+    setAccessActiveTab(defaultTab);
     setAccessDepts(res.allowedDepartments && res.allowedDepartments.length > 0 ? res.allowedDepartments : ['All']);
     setAccessRoles(res.allowedRoles && res.allowedRoles.length > 0 ? res.allowedRoles : ['admin', 'employee', 'manager']);
     setAccessAllowedUsers(res.allowedUsers ? res.allowedUsers.map((u) => (u._id || u).toString()) : []);
+    setAccessBlockedUsers(res.blockedUsers ? res.blockedUsers.map((u) => (u._id || u).toString()) : []);
     setAccessUserSearch('');
     setAccessMfa(res.mfaRequirement || 'Always Required');
     setAccessDownload(res.downloadAllowed !== undefined ? res.downloadAllowed : true);
@@ -86,6 +102,8 @@ const Resources = () => {
     setAccessSensitivity(res.sensitivity || 'Low');
     setAccessSuccess('');
     setAccessError('');
+    setRevokeTargetUserId('');
+    setRevokeReason('Administrative access restriction');
   };
 
   const handleToggleDept = (dept) => {
@@ -125,6 +143,70 @@ const Resources = () => {
     }
   };
 
+  const handleRevokeUser = async (userIdToRevoke, reasonToUse) => {
+    if (!managingAccessRes || !userIdToRevoke) return;
+    setRevokeActionLoading(true);
+    setAccessError('');
+    setAccessSuccess('');
+
+    try {
+      const data = await apiFetch(`/resources/${managingAccessRes._id}/revoke-user`, {
+        method: 'POST',
+        body: {
+          userId: userIdToRevoke,
+          reason: reasonToUse || revokeReason || 'Administrative revocation',
+        },
+      });
+
+      setAccessSuccess(data.message || 'User access revoked successfully.');
+      if (data.resource) {
+        setManagingAccessRes(data.resource);
+        setAccessBlockedUsers(data.resource.blockedUsers ? data.resource.blockedUsers.map((u) => (u._id || u).toString()) : []);
+        setAccessAllowedUsers(data.resource.allowedUsers ? data.resource.allowedUsers.map((u) => (u._id || u).toString()) : []);
+      } else {
+        const idStr = userIdToRevoke.toString();
+        setAccessBlockedUsers((prev) => (prev.includes(idStr) ? prev : [...prev, idStr]));
+        setAccessAllowedUsers((prev) => prev.filter((id) => id !== idStr));
+      }
+      setRevokeTargetUserId('');
+      fetchResources();
+    } catch (err) {
+      setAccessError(err.message || 'Failed to revoke user access.');
+    } finally {
+      setRevokeActionLoading(false);
+    }
+  };
+
+  const handleUnblockUser = async (userIdToUnblock) => {
+    if (!managingAccessRes || !userIdToUnblock) return;
+    setRevokeActionLoading(true);
+    setAccessError('');
+    setAccessSuccess('');
+
+    try {
+      const data = await apiFetch(`/resources/${managingAccessRes._id}/unblock-user`, {
+        method: 'POST',
+        body: {
+          userId: userIdToUnblock,
+        },
+      });
+
+      setAccessSuccess(data.message || 'User access restored successfully.');
+      if (data.resource) {
+        setManagingAccessRes(data.resource);
+        setAccessBlockedUsers(data.resource.blockedUsers ? data.resource.blockedUsers.map((u) => (u._id || u).toString()) : []);
+      } else {
+        const idStr = userIdToUnblock.toString();
+        setAccessBlockedUsers((prev) => prev.filter((id) => id !== idStr));
+      }
+      fetchResources();
+    } catch (err) {
+      setAccessError(err.message || 'Failed to restore user access.');
+    } finally {
+      setRevokeActionLoading(false);
+    }
+  };
+
   const handleSaveAccess = async (e) => {
     e.preventDefault();
     if (!managingAccessRes) return;
@@ -139,6 +221,7 @@ const Resources = () => {
           allowedDepartments: accessDepts,
           allowedRoles: accessRoles,
           allowedUsers: accessAllowedUsers,
+          blockedUsers: accessBlockedUsers,
           mfaRequirement: accessMfa,
           downloadAllowed: accessDownload,
           accessStatus: accessStatus,
@@ -434,17 +517,42 @@ const Resources = () => {
                   </span>
                 </td>
                 <td>
-                  <span
-                    className={`badge ${
-                      res.accessStatus === 'Revoked'
-                        ? 'badge-danger'
-                        : res.accessStatus === 'Restricted'
-                        ? 'badge-warning'
-                        : 'badge-success'
-                    }`}
-                  >
-                    {res.accessStatus || 'Active'}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span
+                      className={`badge ${
+                        res.accessStatus === 'Revoked'
+                          ? 'badge-danger'
+                          : res.accessStatus === 'Restricted'
+                          ? 'badge-warning'
+                          : 'badge-success'
+                      }`}
+                    >
+                      {res.accessStatus || 'Active'}
+                    </span>
+                    {res.blockedUsers && res.blockedUsers.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenAccessModal(res, 'revoked_users');
+                        }}
+                        className="badge badge-danger"
+                        style={{
+                          fontSize: '0.675rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          cursor: 'pointer',
+                          border: 'none',
+                          padding: '2px 6px',
+                        }}
+                        title={`${res.blockedUsers.length} user(s) explicitly revoked. Click to manage.`}
+                      >
+                        <UserX size={10} />
+                        <span>{res.blockedUsers.length} Revoked</span>
+                      </button>
+                    )}
+                  </div>
                 </td>
                 <td>
                   <div className="action-btn-group">
@@ -968,7 +1076,7 @@ const Resources = () => {
       {/* Modal: Manage Resource Access & Permissions */}
       {managingAccessRes && (
         <div className="modal-overlay" onClick={() => setManagingAccessRes(null)}>
-          <div className="modal-content" style={{ maxWidth: '620px' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '680px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '14px' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -986,8 +1094,82 @@ const Resources = () => {
               </button>
             </div>
 
+            {/* Navigation Tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card-subtle)', padding: '0 16px' }}>
+              <button
+                type="button"
+                onClick={() => setAccessActiveTab('policies')}
+                style={{
+                  padding: '12px 16px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: 'none',
+                  color: accessActiveTab === 'policies' ? 'var(--primary)' : 'var(--text-muted)',
+                  borderBottom: accessActiveTab === 'policies' ? '2px solid var(--primary)' : '2px solid transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <Shield size={14} />
+                <span>General Policies</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAccessActiveTab('allowed_users')}
+                style={{
+                  padding: '12px 16px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: 'none',
+                  color: accessActiveTab === 'allowed_users' ? 'var(--primary)' : 'var(--text-muted)',
+                  borderBottom: accessActiveTab === 'allowed_users' ? '2px solid var(--primary)' : '2px solid transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <Users size={14} />
+                <span>Allowed Accounts ({accessAllowedUsers.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAccessActiveTab('revoked_users')}
+                style={{
+                  padding: '12px 16px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: 'none',
+                  color: accessActiveTab === 'revoked_users' ? '#ef4444' : 'var(--text-muted)',
+                  borderBottom: accessActiveTab === 'revoked_users' ? '2px solid #ef4444' : '2px solid transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <UserX size={14} />
+                <span>Revoked Users</span>
+                {accessBlockedUsers.length > 0 && (
+                  <span style={{ backgroundColor: '#ef4444', color: '#fff', fontSize: '0.65rem', padding: '1px 6px', borderRadius: '10px', fontWeight: 700 }}>
+                    {accessBlockedUsers.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
             <form onSubmit={handleSaveAccess}>
-              <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="modal-body" style={{ maxHeight: '68vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {accessError && (
                   <div style={{ color: 'var(--danger-text)', backgroundColor: 'var(--danger-bg)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.8rem' }}>
                     {accessError}
@@ -1000,333 +1182,565 @@ const Resources = () => {
                   </div>
                 )}
 
-                {/* Access Status Section */}
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                    Resource Access Status
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                    {[
-                      { id: 'Active', label: 'Active', desc: 'Available to permitted users', color: 'var(--success-text)', bg: 'var(--success-bg)', border: 'var(--success)' },
-                      { id: 'Restricted', label: 'Restricted', desc: 'Requires step-up approval', color: 'var(--warning-text)', bg: 'var(--warning-bg)', border: 'var(--warning)' },
-                      { id: 'Revoked', label: 'Revoked', desc: 'Access blocked for all users', color: 'var(--danger-text)', bg: 'var(--danger-bg)', border: 'var(--danger)' },
-                    ].map((item) => (
-                      <div
-                        key={item.id}
-                        onClick={() => setAccessStatus(item.id)}
-                        style={{
-                          border: accessStatus === item.id ? `2px solid ${item.border}` : '1px solid var(--border-color)',
-                          backgroundColor: accessStatus === item.id ? item.bg : 'var(--bg-card-subtle)',
-                          borderRadius: '8px',
-                          padding: '12px 10px',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: accessStatus === item.id ? item.color : 'var(--text-primary)' }}>{item.label}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.3 }}>{item.desc}</div>
+                {/* TAB 1: GENERAL POLICIES */}
+                {accessActiveTab === 'policies' && (
+                  <>
+                    {/* Access Status Section */}
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                        Resource Access Status
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                        {[
+                          { id: 'Active', label: 'Active', desc: 'Available to permitted users', color: 'var(--success-text)', bg: 'var(--success-bg)', border: 'var(--success)' },
+                          { id: 'Restricted', label: 'Restricted', desc: 'Requires step-up approval', color: 'var(--warning-text)', bg: 'var(--warning-bg)', border: 'var(--warning)' },
+                          { id: 'Revoked', label: 'Revoked', desc: 'Access blocked for all users', color: 'var(--danger-text)', bg: 'var(--danger-bg)', border: 'var(--danger)' },
+                        ].map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => setAccessStatus(item.id)}
+                            style={{
+                              border: accessStatus === item.id ? `2px solid ${item.border}` : '1px solid var(--border-color)',
+                              backgroundColor: accessStatus === item.id ? item.bg : 'var(--bg-card-subtle)',
+                              borderRadius: '8px',
+                              padding: '12px 10px',
+                              cursor: 'pointer',
+                              textAlign: 'center',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: accessStatus === item.id ? item.color : 'var(--text-primary)' }}>{item.label}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.3 }}>{item.desc}</div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* MFA Policy Section */}
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                    Multi-Factor Authentication (MFA) Requirement
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                    {[
-                      { id: 'Always Required', label: 'Always Required', desc: 'Send 6-digit Email OTP on every access' },
-                      { id: 'Risk-Based', label: 'Risk-Based', desc: 'Prompt OTP only if risk score > 30' },
-                      { id: 'Disabled', label: 'Disabled', desc: 'Direct access without OTP prompt' },
-                    ].map((mfa) => (
-                      <div
-                        key={mfa.id}
-                        onClick={() => setAccessMfa(mfa.id)}
-                        style={{
-                          border: accessMfa === mfa.id ? '2px solid var(--primary)' : '1px solid var(--border-color)',
-                          backgroundColor: accessMfa === mfa.id ? 'var(--primary-light)' : 'var(--bg-card-subtle)',
-                          borderRadius: '8px',
-                          padding: '12px 10px',
-                          cursor: 'pointer',
-                          textAlign: 'center',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, fontSize: '0.825rem', color: accessMfa === mfa.id ? 'var(--primary)' : 'var(--text-primary)' }}>
-                          {mfa.label}
-                        </div>
-                        <div style={{ fontSize: '0.675rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.3 }}>{mfa.desc}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Allowed Departments (Pills) */}
-                <div className="form-group">
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>
-                      Allowed Departments
-                    </label>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button
-                        type="button"
-                        onClick={() => setAccessDepts(['All'])}
-                        className="btn btn-secondary btn-sm"
-                        style={{ fontSize: '0.675rem', padding: '2px 8px' }}
-                      >
-                        Allow All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAccessDepts([]);
-                          setAccessStatus('Restricted');
-                        }}
-                        className="btn btn-sm"
-                        style={{ fontSize: '0.675rem', padding: '2px 8px', backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border, #ef4444)' }}
-                      >
-                        🚫 Disable All (Force Request)
-                      </button>
                     </div>
-                  </div>
 
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleDept('None')}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        border: accessDepts.length === 0 ? '1.5px solid #ef4444' : '1px solid var(--border-color)',
-                        backgroundColor: accessDepts.length === 0 ? '#ef4444' : 'var(--bg-card-subtle)',
-                        color: accessDepts.length === 0 ? '#ffffff' : 'var(--text-secondary)',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      🚫 None (Disabled for All) {accessDepts.length === 0 && '✓'}
-                    </button>
+                    {/* MFA Policy Section */}
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                        Multi-Factor Authentication (MFA) Requirement
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                        {[
+                          { id: 'Always Required', label: 'Always Required', desc: 'Send 6-digit Email OTP on every access' },
+                          { id: 'Risk-Based', label: 'Risk-Based', desc: 'Prompt OTP only if risk score > 30' },
+                          { id: 'Disabled', label: 'Disabled', desc: 'Direct access without OTP prompt' },
+                        ].map((mfa) => (
+                          <div
+                            key={mfa.id}
+                            onClick={() => setAccessMfa(mfa.id)}
+                            style={{
+                              border: accessMfa === mfa.id ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                              backgroundColor: accessMfa === mfa.id ? 'var(--primary-light)' : 'var(--bg-card-subtle)',
+                              borderRadius: '8px',
+                              padding: '12px 10px',
+                              cursor: 'pointer',
+                              textAlign: 'center',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, fontSize: '0.825rem', color: accessMfa === mfa.id ? 'var(--primary)' : 'var(--text-primary)' }}>
+                              {mfa.label}
+                            </div>
+                            <div style={{ fontSize: '0.675rem', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.3 }}>{mfa.desc}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                    {ALL_DEPARTMENTS.map((dept) => {
-                      const isSelected = accessDepts.includes(dept);
-                      return (
+                    {/* Allowed Departments (Pills) */}
+                    <div className="form-group">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>
+                          Allowed Departments
+                        </label>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => setAccessDepts(['All'])}
+                            className="btn btn-secondary btn-sm"
+                            style={{ fontSize: '0.675rem', padding: '2px 8px' }}
+                          >
+                            Allow All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAccessDepts([]);
+                              setAccessStatus('Restricted');
+                            }}
+                            className="btn btn-sm"
+                            style={{ fontSize: '0.675rem', padding: '2px 8px', backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border, #ef4444)' }}
+                          >
+                            🚫 Disable All (Force Request)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                         <button
-                          key={dept}
                           type="button"
-                          onClick={() => handleToggleDept(dept)}
+                          onClick={() => handleToggleDept('None')}
                           style={{
                             padding: '6px 12px',
                             borderRadius: '20px',
                             fontSize: '0.75rem',
                             fontWeight: 600,
                             cursor: 'pointer',
-                            border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                            backgroundColor: isSelected ? 'var(--primary)' : 'var(--bg-card-subtle)',
-                            color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                            border: accessDepts.length === 0 ? '1.5px solid #ef4444' : '1px solid var(--border-color)',
+                            backgroundColor: accessDepts.length === 0 ? '#ef4444' : 'var(--bg-card-subtle)',
+                            color: accessDepts.length === 0 ? '#ffffff' : 'var(--text-secondary)',
                             transition: 'all 0.15s ease',
                           }}
                         >
-                          {dept} {isSelected && '✓'}
+                          🚫 None (Disabled for All) {accessDepts.length === 0 && '✓'}
                         </button>
-                      );
-                    })}
-                  </div>
 
-                  {accessDepts.length === 0 ? (
-                    <div style={{ padding: '8px 12px', backgroundColor: 'var(--warning-bg)', border: '1px solid var(--warning-border, #f59e0b)', borderRadius: '6px', fontSize: '0.725rem', color: 'var(--warning-text, #d97706)' }}>
-                      🔒 <b>Zero-Trust Gate:</b> No department is granted direct access. Users must click <b>"Request Access"</b> to request administrative approval before accessing this resource.
+                        {ALL_DEPARTMENTS.map((dept) => {
+                          const isSelected = accessDepts.includes(dept);
+                          return (
+                            <button
+                              key={dept}
+                              type="button"
+                              onClick={() => handleToggleDept(dept)}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '20px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                                backgroundColor: isSelected ? 'var(--primary)' : 'var(--bg-card-subtle)',
+                                color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              {dept} {isSelected && '✓'}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {accessDepts.length === 0 ? (
+                        <div style={{ padding: '8px 12px', backgroundColor: 'var(--warning-bg)', border: '1px solid var(--warning-border, #f59e0b)', borderRadius: '6px', fontSize: '0.725rem', color: 'var(--warning-text, #d97706)' }}>
+                          🔒 <b>Zero-Trust Gate:</b> No department is granted direct access. Users must click <b>"Request Access"</b> to request administrative approval before accessing this resource.
+                        </div>
+                      ) : accessDepts.includes('All') ? (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          ✓ All corporate departments are permitted direct access under zero-trust policy.
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          Only employees in <b>{accessDepts.join(', ')}</b> are permitted direct access. Others must request access.
+                        </div>
+                      )}
                     </div>
-                  ) : accessDepts.includes('All') ? (
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      ✓ All corporate departments are permitted direct access under zero-trust policy.
+
+                    {/* Allowed Roles (Pills) */}
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                        Allowed User Roles
+                      </label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {ALL_ROLES.map((role) => {
+                          const isSelected = accessRoles.includes(role.id);
+                          return (
+                            <button
+                              key={role.id}
+                              type="button"
+                              onClick={() => handleToggleRole(role.id)}
+                              style={{
+                                padding: '8px 16px',
+                                borderRadius: '8px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
+                                backgroundColor: isSelected ? 'var(--primary-light)' : 'var(--bg-card-subtle)',
+                                color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              {role.label} {isSelected && '✓'}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  ) : (
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      Only employees in <b>{accessDepts.join(', ')}</b> are permitted direct access. Others must request access.
+
+                    {/* Sensitivity & Download Permissions */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 600 }}>Classification Sensitivity</label>
+                        <select
+                          className="form-input"
+                          value={accessSensitivity}
+                          onChange={(e) => setAccessSensitivity(e.target.value)}
+                        >
+                          <option value="Low">Low</option>
+                          <option value="Medium">Medium</option>
+                          <option value="High">High</option>
+                          <option value="Critical">Critical</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 600 }}>File Downloads</label>
+                        <select
+                          className="form-input"
+                          value={accessDownload ? 'true' : 'false'}
+                          onChange={(e) => setAccessDownload(e.target.value === 'true')}
+                        >
+                          <option value="true">Allowed for authorized users</option>
+                          <option value="false">Restricted (View-Only)</option>
+                        </select>
+                      </div>
                     </div>
-                  )}
-                </div>
+                  </>
+                )}
 
-                {/* Allowed Specific User Accounts (Granular Per-User Control) */}
-                <div className="form-group">
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>
-                      Allowed Specific User Accounts ({accessAllowedUsers.length} Selected)
-                    </label>
-                    {accessAllowedUsers.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setAccessAllowedUsers([])}
-                        className="btn btn-secondary btn-sm"
-                        style={{ fontSize: '0.675rem', padding: '2px 8px' }}
-                      >
-                        Clear Specific Users (Allow All in Dept)
-                      </button>
-                    )}
-                  </div>
+                {/* TAB 2: ALLOWED SPECIFIC USER ACCOUNTS */}
+                {accessActiveTab === 'allowed_users' && (
+                  <div className="form-group">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>
+                        Allowed Specific User Accounts ({accessAllowedUsers.length} Selected)
+                      </label>
+                      {accessAllowedUsers.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setAccessAllowedUsers([])}
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.675rem', padding: '2px 8px' }}
+                        >
+                          Clear Specific Users (Allow All in Dept)
+                        </button>
+                      )}
+                    </div>
 
-                  <div style={{ marginBottom: 8 }}>
-                    <input
-                      type="text"
-                      className="form-input"
-                      style={{ fontSize: '0.75rem', padding: '6px 10px' }}
-                      placeholder="Search users by name, email or department..."
-                      value={accessUserSearch}
-                      onChange={(e) => setAccessUserSearch(e.target.value)}
-                    />
-                  </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ fontSize: '0.75rem', padding: '6px 10px' }}
+                        placeholder="Search users by name, email or department..."
+                        value={accessUserSearch}
+                        onChange={(e) => setAccessUserSearch(e.target.value)}
+                      />
+                    </div>
 
-                  <div
-                    style={{
-                      maxHeight: '160px',
-                      overflowY: 'auto',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--bg-card-subtle)',
-                      padding: '8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6,
-                    }}
-                  >
-                    {allUsersList
-                      .filter((u) => {
-                        if (!accessUserSearch) return true;
-                        const q = accessUserSearch.toLowerCase();
-                        return (
-                          (u.fullName && u.fullName.toLowerCase().includes(q)) ||
-                          (u.email && u.email.toLowerCase().includes(q)) ||
-                          (u.department && u.department.toLowerCase().includes(q))
-                        );
-                      })
-                      .map((u) => {
-                        const uid = (u._id || u).toString();
-                        const isSelected = accessAllowedUsers.includes(uid);
-                        return (
-                          <div
-                            key={uid}
-                            onClick={() => handleToggleAllowedUser(uid)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              border: isSelected ? '1px solid var(--primary)' : '1px solid transparent',
-                              backgroundColor: isSelected ? 'var(--primary-light)' : 'var(--bg-card)',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            <div>
-                              <span style={{ fontWeight: 600, fontSize: '0.8rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)', display: 'block' }}>
-                                {u.fullName} <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.725rem' }}>({u.email})</span>
-                              </span>
-                              <span style={{ fontSize: '0.675rem', color: 'var(--text-muted)' }}>
-                                Dept: <b>{u.department || 'General'}</b> • Role: <b>{u.role}</b>
+                    <div
+                      style={{
+                        maxHeight: '260px',
+                        overflowY: 'auto',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        backgroundColor: 'var(--bg-card-subtle)',
+                        padding: '8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                      }}
+                    >
+                      {allUsersList
+                        .filter((u) => {
+                          if (!accessUserSearch) return true;
+                          const q = accessUserSearch.toLowerCase();
+                          return (
+                            (u.fullName && u.fullName.toLowerCase().includes(q)) ||
+                            (u.email && u.email.toLowerCase().includes(q)) ||
+                            (u.department && u.department.toLowerCase().includes(q))
+                          );
+                        })
+                        .map((u) => {
+                          const uid = (u._id || u).toString();
+                          const isSelected = accessAllowedUsers.includes(uid);
+                          return (
+                            <div
+                              key={uid}
+                              onClick={() => handleToggleAllowedUser(uid)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                border: isSelected ? '1px solid var(--primary)' : '1px solid transparent',
+                                backgroundColor: isSelected ? 'var(--primary-light)' : 'var(--bg-card)',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              <div>
+                                <span style={{ fontWeight: 600, fontSize: '0.8rem', color: isSelected ? 'var(--primary)' : 'var(--text-primary)', display: 'block' }}>
+                                  {u.fullName} <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.725rem' }}>({u.email})</span>
+                                </span>
+                                <span style={{ fontSize: '0.675rem', color: 'var(--text-muted)' }}>
+                                  Dept: <b>{u.department || 'General'}</b> • Role: <b>{u.role}</b>
+                                </span>
+                              </div>
+                              <span
+                                className={`badge ${isSelected ? 'badge-primary' : 'badge-secondary'}`}
+                                style={{ fontSize: '0.675rem', padding: '3px 8px' }}
+                              >
+                                {isSelected ? '✓ Allowed' : '+ Grant Access'}
                               </span>
                             </div>
-                            <span
-                              className={`badge ${isSelected ? 'badge-primary' : 'badge-secondary'}`}
-                              style={{ fontSize: '0.675rem', padding: '3px 8px' }}
-                            >
-                              {isSelected ? '✓ Allowed' : '+ Grant Access'}
-                            </span>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                    </div>
+
+                    {accessAllowedUsers.length > 0 ? (
+                      <div style={{ marginTop: 8, padding: '8px 12px', backgroundColor: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: '6px', fontSize: '0.725rem', color: 'var(--primary)', fontWeight: 600 }}>
+                        🎯 <b>Granular Restriction Active:</b> ONLY the {accessAllowedUsers.length} selected user account(s) will be allowed. All other user accounts will be restricted.
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: 6, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        👥 No specific user restrictions. Access is governed by the Allowed Departments & Roles in General Policies.
+                      </div>
+                    )}
                   </div>
+                )}
 
-                  {accessAllowedUsers.length > 0 ? (
-                    <div style={{ marginTop: 6, padding: '6px 10px', backgroundColor: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: '6px', fontSize: '0.725rem', color: 'var(--primary)', fontWeight: 600 }}>
-                      🎯 <b>Granular Restriction Active:</b> ONLY the {accessAllowedUsers.length} selected user account(s) will be allowed. All other user accounts will be restricted.
-                    </div>
-                  ) : (
-                    <div style={{ marginTop: 4, fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      👥 No specific user restrictions. Access is governed by the Allowed Departments & Roles below.
-                    </div>
-                  )}
-                </div>
+                {/* TAB 3: 🚫 REVOKED & BLOCKED USERS MANAGEMENT */}
+                {accessActiveTab === 'revoked_users' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Revoke User Action Box */}
+                    <div
+                      style={{
+                        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                        border: '1.5px solid rgba(239, 68, 68, 0.25)',
+                        borderRadius: '8px',
+                        padding: '16px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <UserX size={18} style={{ color: '#ef4444' }} />
+                        <h3 style={{ margin: 0, fontSize: '0.925rem', fontWeight: 700, color: '#ef4444' }}>
+                          Revoke Resource Access from a Specific User
+                        </h3>
+                      </div>
+                      <p style={{ margin: '0 0 12px 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                        Explicitly block an employee or contractor from viewing, downloading, or streaming this resource. All active access grants and OTP sessions will be terminated immediately.
+                      </p>
 
-                {/* Allowed Roles (Pills) */}
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>
-                    Allowed User Roles
-                  </label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {ALL_ROLES.map((role) => {
-                      const isSelected = accessRoles.includes(role.id);
-                      return (
-                        <button
-                          key={role.id}
-                          type="button"
-                          onClick={() => handleToggleRole(role.id)}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: 4 }}>
+                            Select Target User to Revoke *
+                          </label>
+                          <select
+                            className="form-input"
+                            style={{ fontSize: '0.8rem' }}
+                            value={revokeTargetUserId}
+                            onChange={(e) => setRevokeTargetUserId(e.target.value)}
+                          >
+                            <option value="">-- Choose User Account to Revoke --</option>
+                            {allUsersList
+                              .filter((u) => {
+                                const uid = (u._id || u).toString();
+                                return !accessBlockedUsers.includes(uid);
+                              })
+                              .map((u) => (
+                                <option key={u._id} value={u._id}>
+                                  {u.fullName} ({u.email}) - {u.department || 'General'} [{u.role}]
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: 4 }}>
+                            Revocation Reason / Audit Notes *
+                          </label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ fontSize: '0.8rem' }}
+                            placeholder="e.g. Security policy violation, project offboarding..."
+                            value={revokeReason}
+                            onChange={(e) => setRevokeReason(e.target.value)}
+                          />
+
+                          {/* Quick Preset Badges */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                            <span style={{ fontSize: '0.675rem', color: 'var(--text-muted)', alignSelf: 'center' }}>Quick Reasons:</span>
+                            {[
+                              'Suspicious Activity',
+                              'Project Role Ended',
+                              'Security Policy Violation',
+                              'Temporary Administrative Lock',
+                            ].map((preset) => (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => setRevokeReason(preset)}
+                                style={{
+                                  fontSize: '0.675rem',
+                                  padding: '2px 8px',
+                                  borderRadius: '12px',
+                                  border: '1px solid var(--border-color)',
+                                  backgroundColor: revokeReason === preset ? 'rgba(239, 68, 68, 0.15)' : 'var(--bg-card)',
+                                  color: revokeReason === preset ? '#ef4444' : 'var(--text-secondary)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {preset}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                          <button
+                            type="button"
+                            disabled={!revokeTargetUserId || revokeActionLoading}
+                            onClick={() => handleRevokeUser(revokeTargetUserId, revokeReason)}
+                            className="btn btn-sm"
+                            style={{
+                              backgroundColor: '#ef4444',
+                              color: '#fff',
+                              border: 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '6px 14px',
+                              fontWeight: 600,
+                              cursor: !revokeTargetUserId || revokeActionLoading ? 'not-allowed' : 'pointer',
+                              opacity: !revokeTargetUserId || revokeActionLoading ? 0.6 : 1,
+                            }}
+                          >
+                            <Ban size={13} />
+                            <span>{revokeActionLoading ? 'Revoking Access...' : '🚫 Revoke Access Immediately'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Blocked / Revoked Users List */}
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <ShieldAlert size={15} style={{ color: '#ef4444' }} />
+                          <span>Currently Blocked & Revoked Users ({accessBlockedUsers.length})</span>
+                        </h4>
+                      </div>
+
+                      {accessBlockedUsers.length === 0 ? (
+                        <div
                           style={{
-                            padding: '8px 16px',
+                            padding: '24px 16px',
+                            textAlign: 'center',
+                            backgroundColor: 'var(--bg-card-subtle)',
                             borderRadius: '8px',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            border: isSelected ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
-                            backgroundColor: isSelected ? 'var(--primary-light)' : 'var(--bg-card-subtle)',
-                            color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
-                            transition: 'all 0.15s ease',
+                            border: '1px dashed var(--border-color)',
                           }}
                         >
-                          {role.label} {isSelected && '✓'}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                          <CheckCircle2 size={24} style={{ color: 'var(--success)', margin: '0 auto 6px auto', display: 'block' }} />
+                          <div style={{ fontWeight: 600, fontSize: '0.825rem', color: 'var(--text-primary)' }}>
+                            No users are currently blocked
+                          </div>
+                          <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                            All employees meeting the General Policies have standard access.
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {accessBlockedUsers.map((blockedId) => {
+                            const userObj = allUsersList.find((u) => (u._id || u).toString() === blockedId.toString()) || {
+                              _id: blockedId,
+                              fullName: 'Restricted User',
+                              email: 'user-id: ' + blockedId,
+                              department: 'Blocked Account',
+                              role: 'employee',
+                            };
 
-                {/* Sensitivity & Download Permissions */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: 600 }}>Classification Sensitivity</label>
-                    <select
-                      className="form-input"
-                      value={accessSensitivity}
-                      onChange={(e) => setAccessSensitivity(e.target.value)}
-                    >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                      <option value="Critical">Critical</option>
-                    </select>
+                            return (
+                              <div
+                                key={blockedId}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '10px 14px',
+                                  borderRadius: '8px',
+                                  backgroundColor: 'rgba(239, 68, 68, 0.04)',
+                                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <div
+                                    style={{
+                                      width: 32,
+                                      height: 32,
+                                      borderRadius: '50%',
+                                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                      color: '#ef4444',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontWeight: 700,
+                                      fontSize: '0.8rem',
+                                    }}
+                                  >
+                                    <Ban size={15} />
+                                  </div>
+                                  <div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.825rem', color: 'var(--text-primary)' }}>
+                                      {userObj.fullName}{' '}
+                                      <span style={{ fontWeight: 400, fontSize: '0.725rem', color: 'var(--text-muted)' }}>
+                                        ({userObj.email})
+                                      </span>
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                                      Dept: <b>{userObj.department || 'General'}</b> • Role: <b>{userObj.role}</b> •{' '}
+                                      <span style={{ color: '#ef4444', fontWeight: 600 }}>Access Revoked</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  disabled={revokeActionLoading}
+                                  onClick={() => handleUnblockUser(blockedId)}
+                                  className="btn btn-sm btn-secondary"
+                                  style={{
+                                    fontSize: '0.725rem',
+                                    padding: '4px 10px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                  }}
+                                  title="Unblock user and restore access permissions"
+                                >
+                                  <UserCheck size={13} style={{ color: 'var(--success)' }} />
+                                  <span>Restore / Unblock</span>
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: 600 }}>File Downloads</label>
-                    <select
-                      className="form-input"
-                      value={accessDownload ? 'true' : 'false'}
-                      onChange={(e) => setAccessDownload(e.target.value === 'true')}
-                    >
-                      <option value="true">Allowed for authorized users</option>
-                      <option value="false">Restricted (View-Only)</option>
-                    </select>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setManagingAccessRes(null)}>
-                  Cancel
+                  Close
                 </button>
-                <button
-                  type="submit"
-                  disabled={accessSaving}
-                  className="btn btn-primary btn-sm"
-                  style={{ minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                >
-                  <Shield size={14} />
-                  <span>{accessSaving ? 'Saving Rules...' : 'Save Access Rules'}</span>
-                </button>
+                {accessActiveTab !== 'revoked_users' && (
+                  <button
+                    type="submit"
+                    disabled={accessSaving}
+                    className="btn btn-primary btn-sm"
+                    style={{ minWidth: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  >
+                    <Shield size={14} />
+                    <span>{accessSaving ? 'Saving Rules...' : 'Save Access Rules'}</span>
+                  </button>
+                )}
               </div>
             </form>
           </div>

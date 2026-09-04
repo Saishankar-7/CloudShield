@@ -10,6 +10,8 @@ const {
   requestDocumentOtp,
   verifyDocumentOtp,
   updateResourceAccess,
+  revokeUserResourceAccess,
+  unblockUserResourceAccess,
   getEmployeeDataRecords,
   getDocumentsRecords,
   getReportsRecords,
@@ -52,7 +54,9 @@ router.post('/upload', protect, authorizeRoles('admin'), (req, res, next) => {
   });
 }, uploadCloudDocument);
 
-// Admin-only Access Management & CRUD operations
+// Admin-only Granular Access Management & Per-User Revocation
+router.post('/:id/revoke-user', protect, authorizeRoles('admin'), revokeUserResourceAccess);
+router.post('/:id/unblock-user', protect, authorizeRoles('admin'), unblockUserResourceAccess);
 router.put('/:id/access', protect, authorizeRoles('admin'), updateResourceAccess);
 router.post('/', protect, authorizeRoles('admin'), createResource);
 router.put('/:id', protect, authorizeRoles('admin'), updateResource);

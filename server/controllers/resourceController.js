@@ -27,7 +27,10 @@ const maskEmail = (email) => {
  */
 const getResources = async (req, res) => {
   try {
-    const resources = await Resource.find().populate('accessPolicy');
+    const resources = await Resource.find()
+      .populate('accessPolicy')
+      .populate('allowedUsers', 'fullName email department role')
+      .populate('blockedUsers', 'fullName email department role');
     const user = req.user;
 
     // Simulate request header contexts
@@ -66,9 +69,21 @@ const getResources = async (req, res) => {
           locationInfo,
         });
 
-        // If user already completed MFA during this session, grant Allow for MFA_Required decisions
+        // If user is explicitly in blockedUsers list, enforce immediate DENY
+        const isExplicitlyBlockedUser =
+          resourceItem.blockedUsers &&
+          resourceItem.blockedUsers.some(
+            (uid) => (uid._id || uid).toString() === user._id.toString()
+          );
+
+        if (isExplicitlyBlockedUser) {
+          decision = 'Deny';
+          reason = 'Access to this resource has been explicitly revoked by an administrator for your account.';
+        }
+
+        // If user already completed MFA during this session, grant Allow for MFA_Required decisions (unless blocked)
         const isMfaSessionActive = req.headers['x-mfa-verified'] === 'true' || user.role === 'admin';
-        if (decision === 'MFA_Required' && isMfaSessionActive) {
+        if (decision === 'MFA_Required' && isMfaSessionActive && !isExplicitlyBlockedUser) {
           decision = 'Allow';
           reason = 'Access granted via session Multi-Factor Authentication';
         }
@@ -78,7 +93,7 @@ const getResources = async (req, res) => {
         const isExplicitlyRevokedOrDisabled =
           resourceItem.accessStatus === 'Revoked' ||
           resourceItem.accessStatus === 'Disabled' ||
-          (resourceItem.blockedUsers && resourceItem.blockedUsers.some(uid => (uid._id || uid).toString() === user._id.toString()));
+          isExplicitlyBlockedUser;
 
         if (decision === 'Deny' && !isExplicitlyRevokedOrDisabled && score < 81) {
           const approvedReq = await AccessRequest.findOne({
@@ -134,7 +149,10 @@ const getResources = async (req, res) => {
  */
 const getResourceById = async (req, res) => {
   try {
-    const resource = await Resource.findById(req.params.id);
+    const resource = await Resource.findById(req.params.id)
+      .populate('accessPolicy')
+      .populate('allowedUsers', 'fullName email department role')
+      .populate('blockedUsers', 'fullName email department role');
     if (!resource) {
       return res.status(404).json({ message: 'Resource not found' });
     }
@@ -735,6 +753,158 @@ const updateResourceAccess = async (req, res) => {
 };
 
 /**
+ * Admin: Explicitly Revoke a Particular User's Access to a Resource
+ */
+const revokeUserResourceAccess = async (req, res) => {
+  try {
+    const resourceId = req.params.id;
+    const { userId, reason } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required to revoke access.' });
+    }
+
+    const resource = await Resource.findById(resourceId);
+    if (!resource) {
+      return res.status(404).json({ message: 'Resource not found.' });
+    }
+
+    const User = require('../models/User');
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'Target user not found.' });
+    }
+
+    // Add to blockedUsers if not already present
+    if (!resource.blockedUsers) resource.blockedUsers = [];
+    const isAlreadyBlocked = resource.blockedUsers.some(
+      (uid) => (uid._id || uid).toString() === userId.toString()
+    );
+    if (!isAlreadyBlocked) {
+      resource.blockedUsers.push(userId);
+    }
+
+    // Remove from allowedUsers if present
+    if (resource.allowedUsers && resource.allowedUsers.length > 0) {
+      resource.allowedUsers = resource.allowedUsers.filter(
+        (uid) => (uid._id || uid).toString() !== userId.toString()
+      );
+    }
+
+    await resource.save();
+
+    // Invalidate / Revoke any active Approved Access Requests for this user & resource
+    await AccessRequest.updateMany(
+      { user: userId, resource: resourceId, status: 'Approved' },
+      {
+        status: 'Revoked',
+        reviewedBy: req.user._id,
+        reviewedOn: new Date(),
+        reviewNotes: reason || 'Access explicitly revoked by administrator',
+        accessExpiresOn: new Date(),
+      }
+    );
+
+    // Delete any active DocumentOtp verification records for this user & resource
+    await DocumentOtp.deleteMany({ user: userId, resource: resourceId });
+
+    // Write immutable security audit log
+    await loggingService.logEvent({
+      user: req.user._id,
+      resource: resource._id,
+      eventType: 'Access Revoked',
+      category: 'Admin Actions',
+      accessAction: 'Admin',
+      ipAddress: req.ip || '127.0.0.1',
+      device: req.headers['user-agent'] || 'Browser',
+      severity: 'High',
+      status: 'Success',
+      riskScore: targetUser.riskScore || 20,
+      details: `Admin explicitly revoked access to resource "${resource.name}" from user "${targetUser.fullName}" (${targetUser.email}). Reason: ${reason || 'Administrator administrative revocation'}.`,
+    });
+
+    const updatedResource = await Resource.findById(resourceId)
+      .populate('accessPolicy')
+      .populate('allowedUsers', 'fullName email department role')
+      .populate('blockedUsers', 'fullName email department role');
+
+    res.status(200).json({
+      success: true,
+      message: `Access to "${resource.name}" has been successfully revoked for ${targetUser.fullName}.`,
+      resource: updatedResource,
+      revokedUser: {
+        _id: targetUser._id,
+        fullName: targetUser.fullName,
+        email: targetUser.email,
+        department: targetUser.department,
+      },
+    });
+  } catch (error) {
+    logger.error(`revokeUserResourceAccess error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to revoke user resource access', error: error.message });
+  }
+};
+
+/**
+ * Admin: Unblock / Restore a Particular User's Access to a Resource
+ */
+const unblockUserResourceAccess = async (req, res) => {
+  try {
+    const resourceId = req.params.id;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required to unblock access.' });
+    }
+
+    const resource = await Resource.findById(resourceId);
+    if (!resource) {
+      return res.status(404).json({ message: 'Resource not found.' });
+    }
+
+    const User = require('../models/User');
+    const targetUser = await User.findById(userId);
+
+    // Remove from blockedUsers
+    if (resource.blockedUsers && resource.blockedUsers.length > 0) {
+      resource.blockedUsers = resource.blockedUsers.filter(
+        (uid) => (uid._id || uid).toString() !== userId.toString()
+      );
+      await resource.save();
+    }
+
+    // Write audit log
+    await loggingService.logEvent({
+      user: req.user._id,
+      resource: resource._id,
+      eventType: 'Access Restored',
+      category: 'Admin Actions',
+      accessAction: 'Admin',
+      ipAddress: req.ip || '127.0.0.1',
+      device: req.headers['user-agent'] || 'Browser',
+      severity: 'Low',
+      status: 'Success',
+      riskScore: targetUser ? targetUser.riskScore || 10 : 0,
+      details: `Admin restored/unblocked access to resource "${resource.name}" for user "${targetUser ? targetUser.fullName : userId}".`,
+    });
+
+    const updatedResource = await Resource.findById(resourceId)
+      .populate('accessPolicy')
+      .populate('allowedUsers', 'fullName email department role')
+      .populate('blockedUsers', 'fullName email department role');
+
+    res.status(200).json({
+      success: true,
+      message: `Access to "${resource.name}" has been restored for ${targetUser ? targetUser.fullName : 'the user'}.`,
+      resource: updatedResource,
+    });
+  } catch (error) {
+    logger.error(`unblockUserResourceAccess error: ${error.message}`);
+    res.status(500).json({ message: 'Failed to unblock user access', error: error.message });
+  }
+};
+
+/**
  * Get Synthetic Employee Records for Decrypted HR Database View
  */
 const getEmployeeDataRecords = async (req, res) => {
@@ -826,10 +996,20 @@ const streamResource = async (req, res) => {
     // Zero-Trust Authorization & Per-User Approval Verification
     const user = req.user;
     if (user && user.role !== 'admin') {
+      const isExplicitlyBlockedUser =
+        resource.blockedUsers &&
+        resource.blockedUsers.some(
+          (uid) => (uid._id || uid).toString() === user._id.toString()
+        );
+
+      if (isExplicitlyBlockedUser) {
+        logger.warn(`Unauthorized stream attempt: User ${user.email} is explicitly blocked from resource ${resource.name}`);
+        return res.status(403).send('Access Denied: Your access to this resource has been explicitly revoked by an administrator.');
+      }
+
       const isExplicitlyRevokedOrDisabled =
         resource.accessStatus === 'Revoked' ||
-        resource.accessStatus === 'Disabled' ||
-        (resource.blockedUsers && resource.blockedUsers.some(uid => (uid._id || uid).toString() === user._id.toString()));
+        resource.accessStatus === 'Disabled';
 
       if (isExplicitlyRevokedOrDisabled) {
         logger.warn(`Unauthorized stream attempt: Resource ${resource.name} is revoked/disabled`);
@@ -1031,6 +1211,8 @@ module.exports = {
   requestDocumentOtp,
   verifyDocumentOtp,
   updateResourceAccess,
+  revokeUserResourceAccess,
+  unblockUserResourceAccess,
   getEmployeeDataRecords,
   getDocumentsRecords,
   getReportsRecords,

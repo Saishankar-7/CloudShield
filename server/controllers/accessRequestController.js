@@ -166,12 +166,46 @@ const reviewRequest = async (req, res) => {
 
     await request.save();
 
+    // Synchronize Resource permissions & purge active document OTPs
+    const DocumentOtp = require('../models/DocumentOtp');
+    if (status === 'Revoked') {
+      if (request.resource) {
+        const resourceDoc = await Resource.findById(request.resource._id);
+        if (resourceDoc) {
+          if (!resourceDoc.blockedUsers) resourceDoc.blockedUsers = [];
+          const isBlocked = resourceDoc.blockedUsers.some(
+            (uid) => (uid._id || uid).toString() === request.user._id.toString()
+          );
+          if (!isBlocked) {
+            resourceDoc.blockedUsers.push(request.user._id);
+          }
+          if (resourceDoc.allowedUsers && resourceDoc.allowedUsers.length > 0) {
+            resourceDoc.allowedUsers = resourceDoc.allowedUsers.filter(
+              (uid) => (uid._id || uid).toString() !== request.user._id.toString()
+            );
+          }
+          await resourceDoc.save();
+        }
+      }
+      await DocumentOtp.deleteMany({ user: request.user._id, resource: request.resource._id });
+    } else if (status === 'Approved') {
+      if (request.resource) {
+        const resourceDoc = await Resource.findById(request.resource._id);
+        if (resourceDoc && resourceDoc.blockedUsers && resourceDoc.blockedUsers.length > 0) {
+          resourceDoc.blockedUsers = resourceDoc.blockedUsers.filter(
+            (uid) => (uid._id || uid).toString() !== request.user._id.toString()
+          );
+          await resourceDoc.save();
+        }
+      }
+    }
+
     // Log the review action
     const ip = req.headers['x-simulated-ip'] || req.ip || '192.168.1.10';
     await loggingService.logEvent({
       user: req.user._id,
       resource: request.resource._id,
-      eventType: 'Admin Action',
+      eventType: status === 'Revoked' ? 'Access Revoked' : 'Admin Action',
       category: 'Admin Actions',
       accessAction: 'Admin',
       ipAddress: ip,
@@ -179,10 +213,10 @@ const reviewRequest = async (req, res) => {
       device: req.headers['user-agent'] || 'Browser',
       browser: 'Chrome',
       os: 'Windows',
-      severity: status === 'Approved' ? 'Low' : 'Medium',
+      severity: status === 'Approved' ? 'Low' : 'High',
       status: 'Success',
       riskScore: request.riskScore,
-      details: `Admin reviewed request ${request.requestId} for user ${request.user.fullName}: Decision set to ${status}`,
+      details: `Admin reviewed request ${request.requestId} for user ${request.user.fullName}: Decision set to ${status}. Notes: ${reviewNotes || 'N/A'}`,
     });
 
     res.status(200).json(request);
