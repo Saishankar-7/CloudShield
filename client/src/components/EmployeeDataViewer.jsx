@@ -16,13 +16,14 @@ import {
   Filter
 } from 'lucide-react';
 import { apiFetch } from '../services/api';
+import { FALLBACK_EMPLOYEES } from '../services/fallbackData';
 
 const CLOUDINARY_PDF_URL =
   'https://res.cloudinary.com/dlxueeeau/raw/upload/v1788411013/cloudshield_hr/Enterprise_HR_Employee_Directory_2025.pdf';
 
 export default function EmployeeDataViewer({ resource }) {
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [employees, setEmployees] = useState(FALLBACK_EMPLOYEES);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'pdf'
@@ -33,14 +34,16 @@ export default function EmployeeDataViewer({ resource }) {
   }, []);
 
   const fetchEmployeeRecords = async () => {
-    setLoading(true);
     try {
       const data = await apiFetch('/resources/employee-data/records');
-      if (data && data.employees) {
+      if (data && data.employees && data.employees.length > 0) {
         setEmployees(data.employees);
+      } else {
+        setEmployees(FALLBACK_EMPLOYEES);
       }
     } catch (err) {
-      console.error('Failed to load employee records:', err);
+      console.warn('Backend employee records fetch notice (using built-in HR directory):', err.message);
+      setEmployees(FALLBACK_EMPLOYEES);
     } finally {
       setLoading(false);
     }
